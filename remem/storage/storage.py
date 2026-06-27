@@ -1,35 +1,33 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from uuid import UUID
-from remem.models.retrieval_entry import RetrievalEntry
+
+from remem.models.execution_record import ExecutionRecord
 
 
 class StorageInterface(ABC):
-    """Abstract Base Class (Contract) for storage operations.
-
-    Defines the interface for storing, retrieving, updating, and deleting
-    RetrievalEntries. Follows the Dependency Inversion Principle.
-    """
+    """Abstract Base Class (Contract) for storage operations."""
 
     @abstractmethod
-    def put(self, entry: RetrievalEntry) -> None:
-        """Saves a RetrievalEntry into storage."""
+    def put(self, entry: ExecutionRecord) -> None:
+        """Saves an ExecutionRecord into storage."""
 
     @abstractmethod
-    def get(self, entry_id: UUID) -> Optional[RetrievalEntry]:
-        """Retrieves a RetrievalEntry by its unique ID."""
+    def get(self, entry_id: UUID) -> Optional[ExecutionRecord]:
+        """Retrieves an ExecutionRecord by its unique ID."""
 
     @abstractmethod
     def delete(self, entry_id: UUID) -> bool:
-        """Deletes a RetrievalEntry by its unique ID.
-
-        Returns True if deleted, False if not found.
-        """
+        """Deletes an ExecutionRecord by its unique ID."""
 
     @abstractmethod
-    def update(self, entry: RetrievalEntry) -> None:
-        """Updates an existing RetrievalEntry."""
+    def update(self, entry: ExecutionRecord) -> None:
+        """Updates an existing ExecutionRecord."""
 
     @abstractmethod
-    def all(self) -> List[RetrievalEntry]:
-        """Returns all stored RetrievalEntries."""
+    def increment_hit(self, entry_id: UUID) -> None:
+        """Atomically increments a record's hit counter."""
+
+    @abstractmethod
+    def all(self) -> List[ExecutionRecord]:
+        """Returns all stored ExecutionRecords."""

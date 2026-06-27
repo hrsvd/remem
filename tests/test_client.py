@@ -1,65 +1,37 @@
 import unittest
 from remem.client import Client
+from remem.models.execution_record import ExecutionRecord
 
-
-class TestRemehClientIntegration(unittest.TestCase):
-
+class TestModernClient(unittest.TestCase):
     def setUp(self):
-        """Initialize the public facade client for testing."""
         self.client = Client()
 
-    def test_store_and_lookup_integration(self):
-        """Verify storing and looking up data via the Client works end-to-end."""
-        # 1. Store an entry using the public API
-        self.client.store(
-            embedding=[1.0, 0.0],
-            references=["doc_test.txt"],
-            namespace="test_space"
+    def test_store_and_all_records(self):
+        """Verify storing a rich ExecutionRecord works and persists."""
+        record = ExecutionRecord(
+            embedding=[0.1, 0.9],
+            references=["doc_weather.txt"],
+            namespace="general"
         )
-
-        # 2. Verify it shows up in stats
+        self.client.store(record)
+        
+        all_records = self.client.all()
+        self.assertEqual(len(all_records), 1)
+        self.assertEqual(all_records[0].references, ["doc_weather.txt"])
         self.assertEqual(self.client.stats["entries"], 1)
 
-        # 3. Lookup the entry via the Client facade
-        query_vector = [0.9, 0.1]
-        match = self.client.lookup(query_vector, threshold=0.5)
-
-        # 4. Validate output
-        self.assertIsNotNone(match)
-        self.assertEqual(match.references, ["doc_test.txt"])
-        self.assertEqual(match.namespace, "test_space")
-        self.assertEqual(self.client.stats["hits"], 1)
-        self.assertEqual(self.client.stats["misses"], 0)
-
-    def test_lookup_misses_threshold(self):
-        """Verify that low-similarity lookups are ignored and register as a miss."""
-        self.client.store(
-            embedding=[1.0, 0.0],
-            references=["doc_exact.txt"]
+    def test_delete_record(self):
+        """Verify record deletion reduces inventory accurately."""
+        record = ExecutionRecord(
+            embedding=[0.5, 0.5],
+            references=["deletable.txt"]
         )
-
-        # Query completely orthogonal vector with an overly strict threshold
-        query_vector = [0.0, 1.0]
-        match = self.client.lookup(query_vector, threshold=0.99)
-
-        self.assertIsNone(match)
-        # Update assertions to reflect isolated client state (0 hits, 1 miss)
-        self.assertEqual(self.client.stats["hits"], 0)
-        self.assertEqual(self.client.stats["misses"], 1)
-
-    def test_delete_entry(self):
-        """Verify entry deletion reduces stored inventory accurately."""
-        self.client.store(embedding=[0.5, 0.5], references=["deletable.txt"])
+        self.client.store(record)
         self.assertEqual(self.client.stats["entries"], 1)
 
-        # Grab entry ID to delete
-        all_entries = self.client.all()
-        entry_id = all_entries[0].id
-
-        deletion_success = self.client.delete(entry_id)
+        deletion_success = self.client.delete(record.id)
         self.assertTrue(deletion_success)
         self.assertEqual(self.client.stats["entries"], 0)
-
 
 if __name__ == "__main__":
     unittest.main()

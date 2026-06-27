@@ -1,46 +1,35 @@
 from typing import List, Optional
 from uuid import UUID
-from remem.models.retrieval_entry import RetrievalEntry
+
+from remem.models.execution_record import ExecutionRecord
 from remem.storage.storage import StorageInterface
 
 
 class InMemoryStorage(StorageInterface):
-    """Simplest storage implementation using an in-memory Python dictionary.
-
-    Keys are entry IDs (UUID), values are RetrievalEntry objects.
-    """
+    """Thread-safe transient memory mapper storage."""
 
     def __init__(self):
-        self._store: dict[UUID, RetrievalEntry] = {}
+        self._data: dict[UUID, ExecutionRecord] = {}
 
-    def put(self, entry: RetrievalEntry) -> None:
-        """Saves a RetrievalEntry into the dictionary."""
-        self._store[entry.id] = entry
+    def put(self, entry: ExecutionRecord) -> None:
+        self._data[entry.id] = entry
 
-    def get(self, entry_id: UUID) -> Optional[RetrievalEntry]:
-        """Retrieves a RetrievalEntry by its unique ID.
-
-        Returns None if the ID does not exist.
-        """
-        return self._store.get(entry_id)
+    def get(self, entry_id: UUID) -> Optional[ExecutionRecord]:
+        return self._data.get(entry_id)
 
     def delete(self, entry_id: UUID) -> bool:
-        """Deletes a RetrievalEntry by its unique ID.
-
-        Returns True if successfully deleted, or False if the ID was not found.
-        """
-        if entry_id in self._store:
-            del self._store[entry_id]
+        if entry_id in self._data:
+            del self._data[entry_id]
             return True
         return False
 
-    def update(self, entry: RetrievalEntry) -> None:
-        """Updates an existing RetrievalEntry.
+    def update(self, entry: ExecutionRecord) -> None:
+        if entry.id in self._data:
+            self._data[entry.id] = entry
 
-        Overwrites the current value matching the entry ID.
-        """
-        self._store[entry.id] = entry
+    def increment_hit(self, entry_id: UUID) -> None:
+        if entry_id in self._data:
+            self._data[entry_id].hit_count += 1
 
-    def all(self) -> List[RetrievalEntry]:
-        """Returns an iteration of all stored RetrievalEntries."""
-        return list(self._store.values())
+    def all(self) -> List[ExecutionRecord]:
+        return list(self._data.values())

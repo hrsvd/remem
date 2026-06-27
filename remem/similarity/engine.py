@@ -1,19 +1,28 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Optional
 
-from remem.models.retrieval_entry import RetrievalEntry
+from remem.models.execution_record import ExecutionRecord
 from remem.similarity.metrics import cosine_similarity
 
 
+@dataclass
+class SimilarityMatch:
+    """Explicit response container holding both the found entry and distance calculations."""
+
+    entry: ExecutionRecord
+    score: float
+
+
 class SimilarityEngine:
-    """Finds semantically similar retrieval entries."""
+    """Finds semantically similar execution records."""
 
     def find_best_match(
         self,
         query_embedding: Sequence[float],
-        entries: Sequence[RetrievalEntry],
+        entries: Sequence[ExecutionRecord],
         threshold: float = 0.0,
-    ) -> Optional[RetrievalEntry]:
+    ) -> Optional[SimilarityMatch]:
 
         if not query_embedding or not entries:
             return None
@@ -28,14 +37,16 @@ class SimilarityEngine:
                 highest_score = score
                 best_match = entry
 
-        return best_match
+        if best_match:
+            return SimilarityMatch(entry=best_match, score=highest_score)
+        return None
 
     def find_all_matches(
         self,
         query_embedding: Sequence[float],
-        entries: Sequence[RetrievalEntry],
+        entries: Sequence[ExecutionRecord],
         threshold: float = 0.0,
-    ) -> list[tuple[RetrievalEntry, float]]:
+    ) -> list[tuple[ExecutionRecord, float]]:
 
         if not query_embedding or not entries:
             return []

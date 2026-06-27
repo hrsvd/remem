@@ -1,72 +1,62 @@
-from collections.abc import Sequence
-from typing import List, Optional
+from typing import Any, Callable, Optional
 from uuid import UUID
 
-from remem.models.retrieval_entry import RetrievalEntry
+from remem.models.execution_record import ExecutionRecord
+from remem.reuse.engine import ReuseEngine, ReuseOutcome
 from remem.similarity.engine import SimilarityEngine
 from remem.storage.in_memory_storage import InMemoryStorage
 from remem.storage.storage import StorageInterface
 
 
 class Client:
-    """Public entry point into the Remem engine orchestrating storage
-
-    and dependency wiring.
-    """
+    """Public entry point into the Remem engine orchestrating dependencies cleanly."""
 
     def __init__(self, storage_backend: Optional[StorageInterface] = None):
         self.storage: StorageInterface = storage_backend or InMemoryStorage()
         self.similarity = SimilarityEngine()
-        self._hits = 0
-        self._misses = 0
+        self.reuse_planner = ReuseEngine(self.storage, self.similarity)
+        self._misses = 0  # Fallback counter trackable directly on missing events
 
-    def store(
+    def store(self, record: ExecutionRecord) -> None:
+        """Saves a rich execution record using the single domain object contract."""
+        self.storage.put(record)
+
+    def get_or_compute(
         self,
-        embedding: Sequence[float],
-        references: List[str],
-        namespace: str = "",
-    ) -> None:
-        """Saves a reusable execution entry."""
-        entry = RetrievalEntry(
-            embedding=embedding, references=references, namespace=namespace
-        )
-        self.storage.put(entry)
-
-    def lookup(
-        self, query_embedding: Sequence[float], threshold: float = 0.0
-    ) -> Optional[RetrievalEntry]:
-        """Performs a semantic search lookup over stored entries tracking hits/misses."""
-        entries = self.storage.all()
-        best_match = self.similarity.find_best_match(
-            query_embedding, entries, threshold=threshold
+        query_embedding: list[float],
+        compute_callback: Callable[[], Any],
+        similarity_threshold: float = 0.8,
+        response_reuse_threshold: float = 0.95,
+    ) -> ReuseOutcome:
+        """Flagship reuse planner endpoint."""
+        outcome = self.reuse_planner.get_or_compute(
+            query_embedding=query_embedding,
+            compute_callback=compute_callback,
+            similarity_threshold=similarity_threshold,
+            response_reuse_threshold=response_reuse_threshold,
         )
 
-        if best_match:
-            self._hits += 1
-            return best_match
+        if outcome.decision.value == "MISS":
+            self._misses += 1
 
-        self._misses += 1
-        return None
+        return outcome
 
     def delete(self, entry_id: UUID) -> bool:
         """Removes an entry by ID from underlying storage."""
         return self.storage.delete(entry_id)
 
-    def all(self) -> List[RetrievalEntry]:
-        """Returns all stored entries (primarily for early debugging)."""
+    def all(self) -> list[ExecutionRecord]:
+        """Returns all stored execution records."""
         return self.storage.all()
 
     @property
     def stats(self) -> dict:
         """Exposes observability metrics."""
-        total_lookups = self._hits + self._misses
-        hit_rate = (
-            float(self._hits / total_lookups) if total_lookups > 0 else 0.0
-        )
+        entries_list = self.storage.all()
+        total_hits = sum(e.hit_count for e in entries_list)
 
         return {
-            "entries": len(self.storage.all()),
-            "hits": self._hits,
+            "entries": len(entries_list),
+            "hits": total_hits,
             "misses": self._misses,
-            "hit_rate": round(hit_rate, 4),
         }
