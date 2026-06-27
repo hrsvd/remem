@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-blue.svg">
-  <img alt="Status" src="https://img.shields.io/badge/Status-v0.3.0--alpha-orange">
+  <img alt="Status" src="https://img.shields.io/badge/Status-v0.4.0--alpha-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
 </p>
 
@@ -217,31 +217,42 @@ Remem should integrate with existing AI stacks instead of forcing engineers to a
 Current Version:
 
 ```
-v0.3.0-alpha
+v0.4.0-alpha
+
 ```
+Implemented in v0.4.0:
 
-Implemented in v0.3.0:
+- ✅ Decoupled Execution Contexts (ExecutionContext)
 
-- ✅ Rich Execution Records & Callbacks
-- ✅ Decoupled Reuse Decision Engine
-- ✅ Similarity Engine returning SimilarityMatch containers
-- ✅ InMemoryStorage with atomic hit increments
-- ✅ Clean public Client Facade
+- ✅ Policy-driven compatibility checks (ReusePolicy)
+
+- ✅ Metadata filtering before similarity math (MetadataMatcher)
+
+- ✅ Modular folder structure for reuse layers
+
+- ✅ Policy-compliant client interface
 
 Not yet implemented (Planned for future versions):
 
-- Persistence
+- Metrics Collector & Explanations API
+
+- Persistence Layer
+
 - HTTP server
+
 - SDKs
+
 - Distributed mode
+
 - Rust acceleration
+
 
 ---
 
 # Current Architecture
 
 
-The architecture cleanly decouples the public Client, the Reuse Planner decision engine, and the underlying storage/similarity layers, ensuring high modularity and scalability.
+The architecture cleanly decouples the public Client, policy engines, metadata matchers, and underlying storage/similarity layers, ensuring high modularity and scalability.
 
 ---
 
@@ -249,14 +260,16 @@ The architecture cleanly decouples the public Client, the Reuse Planner decision
 
 ```
 remem/
-
 ├── docs/
 ├── remem/
 │   ├── models/
+│   │   ├── execution_context.py
 │   │   ├── execution_record.py
 │   │   └── execution_result.py
 │   ├── reuse/
-│   │   └── engine.py
+│   │   ├── engine.py
+│   │   ├── matcher.py
+│   │   └── policy.py
 │   ├── similarity/
 │   └── storage/
 ├── examples/
@@ -280,10 +293,10 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Run the v0.3.0 reuse planner example:
+Run the v0.4.0 policy-driven reuse example:
 
 ```bash
-python examples/basic_demo.py
+python examples/policy_demo.py
 ```
 
 ---
@@ -330,15 +343,15 @@ Similarity
 
 ---
 
-## v0.3.0 (Current)
+## v0.3.0 
 
 Intelligent Execution Reuse Engine with rich execution records (`get_or_compute`).
 
 ---
 
-## v0.4.0
+## v0.4.0 (Current)
 
-Work Reuse API expansions.
+Metadata-aware policy matching engine with explicit ExecutionContext and ReusePolicy.
 
 ---
 
@@ -376,6 +389,9 @@ SDKs
 Production-ready AI Work Reuse Engine
 
 ---
+
+
+
 
 # Long-Term Goals
 
@@ -453,7 +469,7 @@ See the `LICENSE` file for details.
 
 # Project Status
 
-⚠️ **Early Alpha (v0.3.0)**
+⚠️ **Early Alpha (v0.4.0)**
 
 The project is under active development.
 
