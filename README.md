@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-blue.svg">
-  <img alt="Status" src="https://img.shields.io/badge/Status-v0.1.0--alpha-orange">
+  <img alt="Status" src="https://img.shields.io/badge/Status-v0.3.0--alpha-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
 </p>
 
@@ -217,27 +217,22 @@ Remem should integrate with existing AI stacks instead of forcing engineers to a
 Current Version:
 
 ```
-v0.1.0-alpha
+v0.3.0-alpha
 ```
 
-Implemented:
+Implemented in v0.3.0:
 
-- ✅ RetrievalEntry model
-- ✅ Cosine similarity implementation
-- ✅ Similarity engine
-- ✅ In-memory storage
-- ✅ Storage abstraction
-- ✅ Unit tests
-- ✅ Example application
+- ✅ Rich Execution Records & Callbacks
+- ✅ Decoupled Reuse Decision Engine
+- ✅ Similarity Engine returning SimilarityMatch containers
+- ✅ InMemoryStorage with atomic hit increments
+- ✅ Clean public Client Facade
 
-Not yet implemented:
+Not yet implemented (Planned for future versions):
 
-- Execution engine
-- Work reuse API
 - Persistence
 - HTTP server
 - SDKs
-- Metrics
 - Distributed mode
 - Rust acceleration
 
@@ -245,20 +240,8 @@ Not yet implemented:
 
 # Current Architecture
 
-```
-Application
-      │
-      ▼
-Similarity Engine
-      │
-      ▼
-In-Memory Storage
-      │
-      ▼
-Retrieval Entries
-```
 
-Current implementation focuses on building the core foundations before introducing more advanced features.
+The architecture cleanly decouples the public Client, the Reuse Planner decision engine, and the underlying storage/similarity layers, ensuring high modularity and scalability.
 
 ---
 
@@ -268,13 +251,14 @@ Current implementation focuses on building the core foundations before introduci
 remem/
 
 ├── docs/
-├── server/
-│   ├── main.py
-│   ├── tests/
-│   └── remem/
-│       ├── models/
-│       ├── similarity/
-│       └── storage/
+├── remem/
+│   ├── models/
+│   │   ├── execution_record.py
+│   │   └── execution_result.py
+│   ├── reuse/
+│   │   └── engine.py
+│   ├── similarity/
+│   └── storage/
 ├── examples/
 ├── benchmarks/
 └── README.md
@@ -296,21 +280,22 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Run the example:
+Run the v0.3.0 reuse planner example:
 
 ```bash
-python server/main.py
+python examples/basic_demo.py
 ```
 
 ---
 
 # Running Tests
 
-```
+```bash
 pytest
 ```
 
 ---
+
 
 # Development Roadmap
 
@@ -345,25 +330,15 @@ Similarity
 
 ---
 
-## v0.3.0
+## v0.3.0 (Current)
 
-Execution Engine
-
-Prevent duplicate retrieval work while requests are executing simultaneously.
+Intelligent Execution Reuse Engine with rich execution records (`get_or_compute`).
 
 ---
 
 ## v0.4.0
 
-Work Reuse API
-
-```
-get_or_compute()
-```
-
-The application supplies a callback.
-
-Remem determines whether previous work can be reused.
+Work Reuse API expansions.
 
 ---
 
@@ -478,7 +453,7 @@ See the `LICENSE` file for details.
 
 # Project Status
 
-⚠️ **Early Alpha**
+⚠️ **Early Alpha (v0.3.0)**
 
 The project is under active development.
 
