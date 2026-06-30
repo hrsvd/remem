@@ -29,6 +29,72 @@ class Client:
             self.storage, self.similarity, self.policy, self.metrics
         )
 
+    def check(
+        self,
+        query_embedding: list[float],
+        context: Optional[ExecutionContext] = None,
+    ) -> ReuseOutcome:
+        """Check whether previous work can be reused — without running your pipeline.
+
+        Returns a :class:`ReuseOutcome` whose ``decision`` field tells you
+        exactly what to do next:
+
+        * ``RESPONSE_REUSED`` — ``outcome.result`` is the cached answer.
+          Return it directly; skip your entire pipeline.
+        * ``RETRIEVAL_REUSED`` — ``outcome.references`` are the cached documents.
+          Pass them straight to your LLM (skip the vector-DB search), then
+          call :meth:`remember` to store the fresh response.
+        * ``MISS`` — no usable previous work.  Run your full pipeline, then
+          call :meth:`remember` to store the result.
+
+        Example::
+
+            outcome = client.check(embed(query), context=ctx)
+
+            if outcome.decision == ReuseDecision.RESPONSE_REUSED:
+                return outcome.result
+
+            if outcome.decision == ReuseDecision.RETRIEVAL_REUSED:
+                response = call_llm(query, outcome.references)  # no vector-DB call
+                client.remember(embed(query), response, outcome.references, context=ctx)
+                return response
+
+            # MISS: full pipeline
+            docs = search_vector_db(query)
+            response = call_llm(query, docs)
+            client.remember(embed(query), response, docs, context=ctx)
+            return response
+        """
+        exec_context = context or ExecutionContext()
+        return self.reuse_planner.check(query_embedding, exec_context)
+
+    def remember(
+        self,
+        query_embedding: list[float],
+        response: object,
+        references: Optional[list[str]] = None,
+        context: Optional[ExecutionContext] = None,
+    ) -> None:
+        """Store the result of a pipeline execution so it can be reused later.
+
+        Call this after running your pipeline following a ``MISS`` or
+        ``RETRIEVAL_REUSED`` decision from :meth:`check`.
+
+        Example::
+
+            docs = search_vector_db(query)
+            answer = call_llm(query, docs)
+            client.remember(embed(query), answer, references=docs, context=ctx)
+        """
+        from uuid import uuid4
+        self.storage.put(ExecutionRecord(
+            id=uuid4(),
+            embedding=query_embedding,
+            response=response,
+            references=references or [],
+            context=context or ExecutionContext(),
+        ))
+
     def store(self, record: ExecutionRecord) -> None:
         """Saves a rich execution record directly."""
         self.storage.put(record)

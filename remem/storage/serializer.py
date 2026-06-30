@@ -1,7 +1,9 @@
-from uuid import UUID
+from datetime import datetime
 from typing import Any, Dict, List
-from remem.models.execution_record import ExecutionRecord
+from uuid import UUID
+
 from remem.models.execution_context import ExecutionContext
+from remem.models.execution_record import ExecutionRecord
 
 
 class Serializer:
@@ -16,11 +18,14 @@ class Serializer:
             "references": record.references,
             "response": record.response,
             "hit_count": record.hit_count,
+            "created_at": record.created_at.isoformat(),
             "context": {
                 "namespace": record.context.namespace,
                 "kb_version": record.context.kb_version,
                 "prompt_version": record.context.prompt_version,
-            } if record.context else None
+                "model": record.context.model,
+                "metadata": record.context.metadata,
+            } if record.context else None,
         }
 
     @staticmethod
@@ -29,17 +34,26 @@ class Serializer:
         ctx_data = data.get("context") or {}
         context = ExecutionContext(
             namespace=ctx_data.get("namespace", ""),
-            kb_version=ctx_data.get("kb_version", ""),
-            prompt_version=ctx_data.get("prompt_version", ""),
+            kb_version=ctx_data.get("kb_version", "1.0"),
+            prompt_version=ctx_data.get("prompt_version", "1.0"),
+            model=ctx_data.get("model"),
+            metadata=ctx_data.get("metadata") or {},
         )
 
-        return ExecutionRecord(
+        record = ExecutionRecord(
             id=UUID(data["id"]),
             embedding=data["embedding"],
             references=data["references"],
             response=data.get("response"),
             context=context,
+            hit_count=data.get("hit_count", 0),
         )
+
+        created_at = data.get("created_at")
+        if created_at:
+            record.created_at = datetime.fromisoformat(created_at)
+
+        return record
 
     @staticmethod
     def serialize_many(records: List[ExecutionRecord]) -> List[Dict[str, Any]]:

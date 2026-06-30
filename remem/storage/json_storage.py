@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from typing import List, Optional
 from uuid import UUID
 
@@ -72,16 +73,28 @@ class JsonStorage(StorageInterface):
             with open(temp_filepath, "w", encoding="utf-8") as f:
                 json.dump(snapshot.__dict__, f, indent=2)
 
-            # Atomic swap rename operation
-            if os.path.exists(self.filepath):
-                os.replace(temp_filepath, self.filepath)
-            else:
-                os.rename(temp_filepath, self.filepath)
+            # Atomic swap rename operation.
+            # On Windows os.replace can transiently raise PermissionError when
+            # the destination is briefly held open by another process (e.g. an
+            # antivirus or indexer), so retry a few times before giving up.
+            self._atomic_replace(temp_filepath, self.filepath)
 
         except Exception as e:
             if os.path.exists(temp_filepath):
                 os.remove(temp_filepath)
             raise PersistenceException(f"Failed to perform atomic storage save: {e}") from e
+
+    @staticmethod
+    def _atomic_replace(src: str, dst: str, retries: int = 5, delay: float = 0.05) -> None:
+        """Replaces ``dst`` with ``src`` atomically, retrying on Windows lock errors."""
+        for attempt in range(retries):
+            try:
+                os.replace(src, dst)
+                return
+            except PermissionError:
+                if attempt == retries - 1:
+                    raise
+                time.sleep(delay)
 
     def increment_hit(self, entry_id: UUID) -> None:
         """Atomically increments hit metrics and persists records to disk."""

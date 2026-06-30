@@ -34,3 +34,8 @@ class StorageInterface(ABC):
     @abstractmethod
     def load(self) -> None:
         pass
+
+    @abstractmethod
+    def increment_hit(self, entry_id: UUID) -> None:
+        """Increments the reuse hit counter for a stored record."""
+        pass

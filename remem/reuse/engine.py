@@ -28,40 +28,105 @@ class ReuseEngine:
         self.policy = policy
         self.metrics = metrics
 
+    def _find_best_compatible(
+        self,
+        query_embedding: list[float],
+        context: ExecutionContext,
+        threshold: float,
+    ):
+        """Shared metadata-filter + similarity scan used by both public methods."""
+        all_entries = self.storage.all()
+        compatible = MetadataMatcher.filter_candidates(all_entries, context, self.policy)
+        return self.similarity.find_best_match(query_embedding, compatible, threshold=threshold)
+
+    def check(
+        self,
+        query_embedding: list[float],
+        context: ExecutionContext,
+    ) -> ReuseDecision:
+        """Returns the reuse decision and any cached artifacts without running any callback.
+
+        The caller inspects the decision and routes accordingly:
+
+        * ``RESPONSE_REUSED`` – ``outcome.result`` holds the cached LLM response.
+          No pipeline work needed.
+        * ``RETRIEVAL_REUSED`` – ``outcome.references`` holds the cached documents.
+          Skip the vector-DB search; pass those docs to your LLM, then call
+          ``remember()`` to store the result.
+        * ``MISS`` – no usable previous work.  Run the full pipeline and call
+          ``remember()`` to store the result.
+        """
+        self.metrics.record(MetricEvent.REQUEST)
+        best_match = self._find_best_compatible(
+            query_embedding, context, self.policy.retrieval_threshold
+        )
+
+        if not best_match:
+            self.metrics.record(MetricEvent.MISS)
+            return ReuseOutcome(
+                result=None,
+                decision=ReuseDecision.MISS,
+                similarity_score=0.0,
+                reason="No compatible execution found.",
+            )
+
+        matched = best_match.entry
+        self.storage.increment_hit(matched.id)
+        score = best_match.score
+
+        if score >= self.policy.response_threshold and matched.response is not None:
+            self.metrics.record(MetricEvent.HIT, similarity=score)
+            self.metrics.record(MetricEvent.RESPONSE_REUSED)
+            return ReuseOutcome(
+                result=matched.response,
+                decision=ReuseDecision.RESPONSE_REUSED,
+                similarity_score=score,
+                reason=f"Vector similarity {score:.2f} met response threshold.",
+                matched_record_id=matched.id,
+                references=matched.references,
+            )
+
+        self.metrics.record(MetricEvent.HIT, similarity=score)
+        self.metrics.record(MetricEvent.RETRIEVAL_REUSED)
+        return ReuseOutcome(
+            result=None,
+            decision=ReuseDecision.RETRIEVAL_REUSED,
+            similarity_score=score,
+            reason=f"Vector similarity {score:.2f} met retrieval threshold but fell below response threshold.",
+            matched_record_id=matched.id,
+            references=matched.references,
+        )
+
     def get_or_compute(
         self,
         query_embedding: list[float],
         compute_callback: Callable[[], ExecutionResult],
         context: ExecutionContext,
     ) -> ReuseOutcome:
+        """All-in-one reuse planner: runs ``compute_callback`` only when necessary.
 
+        For the RETRIEVAL_REUSED branch the callback is still invoked (because
+        it owns the full pipeline), but ``outcome.references`` carries the
+        cached documents so callers that inspect the decision can skip their
+        own vector-DB search.  Prefer ``check()`` + ``remember()`` when you
+        want explicit control over each pipeline stage.
+        """
         self.metrics.record(MetricEvent.REQUEST)
-
-        # 1. Apply metadata compatibility filtering before vector similarity scan
-        all_entries = self.storage.all()
-        compatible_candidates = MetadataMatcher.filter_candidates(
-            all_entries, context, self.policy
+        best_match = self._find_best_compatible(
+            query_embedding, context, self.policy.retrieval_threshold
         )
 
-        # 2. Query vector scan abstracted purely over compatible records
-        best_match = self.similarity.find_best_match(
-            query_embedding, compatible_candidates, threshold=self.policy.retrieval_threshold
-        )
-
-        # Cache MISS Scenario
+        # MISS: run full pipeline and store the result
         if not best_match:
             self.metrics.record(MetricEvent.MISS)
             exec_result = compute_callback()
-
-            new_record = ExecutionRecord(
+            self.storage.put(ExecutionRecord(
                 id=uuid4(),
                 embedding=query_embedding,
                 references=exec_result.references,
                 response=exec_result.response,
                 context=context,
-            )
-            self.storage.put(new_record)
-
+            ))
             return ReuseOutcome(
                 result=exec_result.response,
                 decision=ReuseDecision.MISS,
@@ -74,7 +139,7 @@ class ReuseEngine:
         self.storage.increment_hit(matched_entry.id)
         score = best_match.score
 
-        # Cache HIT: High Confidence (Reuse cached response)
+        # Full hit: return cached LLM response, skip pipeline entirely
         if score >= self.policy.response_threshold and matched_entry.response is not None:
             self.metrics.record(MetricEvent.HIT, similarity=score)
             self.metrics.record(MetricEvent.RESPONSE_REUSED)
@@ -87,11 +152,17 @@ class ReuseEngine:
                 references=matched_entry.references,
             )
 
-        # Partial Hit (Retrieval Reused, Computation re-run)
+        # Partial hit: retrieval can be reused, re-run computation, store new result
         self.metrics.record(MetricEvent.HIT, similarity=score)
         self.metrics.record(MetricEvent.RETRIEVAL_REUSED)
         computed_exec = compute_callback()
-
+        self.storage.put(ExecutionRecord(
+            id=uuid4(),
+            embedding=query_embedding,
+            references=computed_exec.references,
+            response=computed_exec.response,
+            context=context,
+        ))
         return ReuseOutcome(
             result=computed_exec.response,
             decision=ReuseDecision.RETRIEVAL_REUSED,
