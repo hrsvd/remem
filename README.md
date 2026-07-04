@@ -3,493 +3,145 @@
 > **Remember expensive AI work. Reuse it intelligently.**
 
 <p align="center">
-  <strong>An AI Work Reuse Engine for Retrieval-Augmented Generation (RAG), AI Agents, and LLM Applications.</strong>
+  <strong>An AI-native work reuse engine for RAG pipelines, AI agents, and LLM applications</strong>
 </p>
 
 <p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-blue.svg">
-  <img alt="Status" src="https://img.shields.io/badge/Status-v0.1.0--alpha-orange">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
+  <img alt="Version" src="https://img.shields.io/badge/Version-v1.0.0--beta-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
+  <img alt="PyPI" src="https://img.shields.io/badge/PyPI-remem--ai-blue">
+</p>
+
+<p align="center">
+  <a href="docs/quickstart.md">Quickstart</a> ·
+  <a href="docs/api.md">API Reference</a> ·
+  <a href="docs/architecture.md">Architecture</a> ·
+  <a href="docs/benchmarks.md">Benchmarks</a> ·
+  <a href="docs/roadmap.md">Roadmap</a> ·
+  <a href="docs/faq.md">FAQ</a>
 </p>
 
 ---
 
-# Why Remem?
+## Overview
 
-Modern AI applications repeatedly execute expensive operations for requests that are often semantically similar.
+Modern AI applications repeatedly execute expensive operations — vector database searches, LLM calls, tool executions, reranking passes — for requests that are often semantically identical or very similar to ones already served.
 
-A typical AI workflow may involve:
-
-* Generating embeddings
-* Searching vector databases
-* Retrieving knowledge chunks
-* Reranking retrieved documents
-* Constructing prompts
-* Calling Large Language Models (LLMs)
-* Executing tools or SQL queries
-* Running multi-step agent workflows
-
-Although user queries may be phrased differently, they frequently require nearly identical computation.
-
-For example:
-
-```text
-"What is our company's vacation policy?"
-
-"What are the PTO rules?"
-
-"How many paid leaves do employees receive?"
-```
-
-Most AI systems execute the entire pipeline independently for each request, even when much of the previous work could be safely reused.
-
-This leads to:
-
-* Higher inference costs
-* Increased latency
-* Unnecessary vector searches
-* Repeated reranking
-* Duplicate LLM calls
-* Repeated tool execution
-* Wasted infrastructure resources
-
-Remem exists to eliminate redundant AI work.
-
-Instead of treating every request as completely new, Remem remembers previously executed work and determines whether any part of it can be safely reused.
-
----
-
-# Vision
-
-Remem is an **AI Work Reuse Engine**.
-
-Rather than replacing your existing infrastructure (Redis, Postgres, Pinecone, Qdrant, Weaviate, Milvus, pgvector, or custom retrieval systems), Remem integrates alongside your application and continuously observes expensive AI operations.
-
-When a new request arrives, Remem analyzes previously completed work and determines the highest level of computation that can be safely reused.
-
-Depending on the request, this may include:
-
-* Previously generated LLM responses
-* Retrieved knowledge chunks
-* Reranked search results
-* Tool outputs
-* SQL query results
-* Agent execution artifacts
-* Other reusable intermediate computations
-
-If no reusable work exists, the application executes normally, and Remem learns from the new execution for future requests.
-
-The long-term vision is to become a lightweight infrastructure component that AI engineers can integrate into existing RAG systems, AI agents, and LLM applications with minimal changes.
-
----
-
-# The Problem
-
-A typical Retrieval-Augmented Generation (RAG) pipeline looks like this:
-
-```text
-                 User Query
-                      │
-                      ▼
-            Generate Embedding
-                      │
-                      ▼
-          Search Vector Database
-                      │
-                      ▼
-            Retrieve Knowledge
-                      │
-                      ▼
-                Rerank Results
-                      │
-                      ▼
-            Construct Prompt
-                      │
-                      ▼
-                 Call the LLM
-                      │
-                      ▼
-                  Final Answer
-```
-
-Even when multiple users ask nearly identical questions, this entire pipeline is often executed repeatedly.
-
-As applications scale, this repeated computation becomes one of the largest contributors to latency and infrastructure cost.
-
----
-
-# How Remem Works
-
-Instead of assuming every request requires a full execution, Remem attempts to reuse previous work whenever it is safe to do so.
-
-```text
-                 Incoming Request
-                        │
-                        ▼
-              Generate Embedding
-                        │
-                        ▼
-               Semantic Similarity
-                        │
-                        ▼
-            AI Work Reuse Decision
-                        │
-     ┌──────────────────┼──────────────────┐
-     │                  │                  │
-     ▼                  ▼                  ▼
-Reuse Response   Reuse Retrieval     Execute Pipeline
-     │                  │                  │
-     │                  ▼                  ▼
-     │           Skip Retrieval      Store New Execution
-     │             & Reranking             │
-     └──────────────────┴──────────────────┘
-                        │
-                        ▼
-                 Return Result
-```
-
-Rather than acting as a traditional cache, Remem behaves like a decision engine that selects the highest level of reusable computation for each request.
-
----
-
-# What Can Remem Reuse?
-
-Depending on the request and available metadata, Remem may reuse:
-
-* Entire LLM responses
-* Retrieved knowledge chunks
-* Reranked search results
-* Prompt construction artifacts
-* Tool execution results
-* SQL query results
-* Agent execution artifacts
-* Future AI workflow outputs
-
-Not every request can safely reuse every artifact.
-
-For example:
-
-* If the knowledge base has changed, Remem may skip response reuse but still reuse retrieval results.
-* If the retrieval results have changed, Remem executes a fresh retrieval.
-* If no previous work is reusable, the application executes normally.
-
-Rather than guaranteeing that every request avoids an LLM call, Remem always chooses the **highest level of reusable work that preserves correctness**.
-
-In some situations, this completely eliminates another LLM invocation.
-
-In others, it may reuse only the retrieval stage while generating a fresh response.
-
-This adaptive approach minimizes latency, reduces infrastructure cost, and maintains response quality without requiring changes to an application's existing retrieval pipeline.
-
-
-# Design Philosophy
-
-Remem follows a few simple principles.
-
-## Correctness before optimization
-
-Always build the correct solution before making it faster.
-
----
-
-## Measure before optimizing
-
-Every optimization should be supported by benchmarks.
-
----
-
-## Keep public APIs simple
-
-Internal architecture may evolve.
-
-The public API should remain stable.
-
----
-
-## Observe rather than replace
-
-Remem should integrate with existing AI stacks instead of forcing engineers to adopt new databases or retrieval systems.
-
----
-
-# Current Status
-
-Current Version:
+Remem sits between your application and its expensive AI operations. It observes what has already been computed, and for each new request it determines the highest level of previous work that can be safely reused — based on **semantic similarity**, not exact key matching.
 
 ```
-v0.1.0-alpha
+User asks: "What is our company's vacation policy?"
+User asks: "How many paid leaves do employees get?"   <-- Remem reuses the first answer
+User asks: "What are the PTO rules?"                  <-- Remem reuses the first answer
 ```
 
-Implemented:
+## Why Not Just Use Redis?
 
-- ✅ RetrievalEntry model
-- ✅ Cosine similarity implementation
-- ✅ Similarity engine
-- ✅ In-memory storage
-- ✅ Storage abstraction
-- ✅ Unit tests
-- ✅ Example application
+Redis answers: *"Have I seen this exact key before?"*
+Remem answers: *"Have I already done similar expensive AI work before?"*
 
-Not yet implemented:
+| | Redis | Remem |
+|---|---|---|
+| Matching strategy | Exact key | Semantic similarity (embeddings) |
+| Scope | Key-value lookup | Full AI pipeline reuse |
+| Deployment | Separate service | Python library — import and go |
+| AI-aware | No | Yes — understands embeddings, models, and prompts |
 
-- Execution engine
-- Work reuse API
-- Persistence
-- HTTP server
-- SDKs
-- Metrics
-- Distributed mode
-- Rust acceleration
+## How It Works
 
----
+Remem makes a three-way decision for every incoming request, based on how similar it is to work that has already been done:
 
-# Current Architecture
+| Decision | When it happens | Effect |
+|---|---|---|
+| **Full reuse** | The request is nearly identical to a past one | The cached response is returned immediately — no vector search, no LLM call |
+| **Partial reuse** | The request is related, but not identical | Cached retrieval results are reused; only the generation step re-runs |
+| **Miss** | Nothing sufficiently similar has been seen | The full pipeline runs, and the result is stored for next time |
 
-```
-Application
-      │
-      ▼
-Similarity Engine
-      │
-      ▼
-In-Memory Storage
-      │
-      ▼
-Retrieval Entries
-```
+Similarity is only ever compared between compatible executions — Remem is aware of concepts like namespace, knowledge-base version, and model, so updating your data or switching models never results in stale or incorrect reuse.
 
-Current implementation focuses on building the core foundations before introducing more advanced features.
+For the full decision model, thresholds, and configuration options, see the [Architecture guide](docs/architecture.md) and [API Reference](docs/api.md).
 
----
+## Features
 
-# Repository Structure
+- **Three-level reuse engine** — full response reuse, partial retrieval reuse, or a clean miss
+- **Semantic similarity matching** — cosine similarity over embedding vectors, no exact-match required
+- **Context-aware filtering** — namespace, knowledge-base version, prompt version, and model constraints are respected before anything is reused
+- **Configurable reuse policy** — tune thresholds and constraints to match your application
+- **Durable persistence** — a file-backed store that survives process restarts, with atomic writes
+- **In-memory mode** — zero-disk-I/O storage for tests, notebooks, and short-lived jobs
+- **Pluggable storage** — bring your own backend (Redis, Postgres, S3, or anything else)
+- **Built-in telemetry** — hit rate, reuse breakdown, and average similarity, out of the box
+- **Minimal footprint** — a single runtime dependency (`numpy`)
 
-```
-remem/
+## Installation
 
-├── docs/
-├── server/
-│   ├── main.py
-│   ├── tests/
-│   └── remem/
-│       ├── models/
-│       ├── similarity/
-│       └── storage/
-├── examples/
-├── benchmarks/
-└── README.md
-```
-
----
-
-# Running the Demo
-
-Clone the repository:
+**Requirements:** Python 3.10 or later.
 
 ```bash
-git clone https://github.com/<your-username>/remem.git
+pip install remem-ai
 ```
 
-Install dependencies:
+Remem has a single runtime dependency (`numpy`), which is installed automatically.
+
+<details>
+<summary>Installing from source</summary>
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/harshvardhansingh7/remem.git
+cd remem
+pip install -e ".[dev]"    # editable install with pytest and ruff
+```
+</details>
+
+## Quickstart
+
+```python
+from remem import Client, ExecutionResult
+
+client = Client()   # durable persistence by default
+
+def my_pipeline():
+    docs = search_vector_db(query)
+    answer = call_llm(query, docs)
+    return ExecutionResult(response=answer, references=docs)
+
+outcome = client.get_or_compute(
+    query_embedding=embed(query),
+    compute_callback=my_pipeline,
+)
+
+print(outcome.result)   # cached or freshly computed — Remem decides
 ```
 
-Run the example:
+New to Remem? Start with the [5-minute Quickstart](docs/quickstart.md). For the complete method-by-method reference, see the [API Reference](docs/api.md).
 
-```bash
-python server/main.py
-```
+## Documentation
 
----
+| Guide | Description |
+|---|---|
+| [Quickstart](docs/quickstart.md) | Get a working integration in under five minutes |
+| [API Reference](docs/api.md) | Every class, method, and configuration option |
+| [Architecture](docs/architecture.md) | How Remem is designed internally |
+| [Benchmarks](docs/benchmarks.md) | What Remem measures and why |
+| [Roadmap](docs/roadmap.md) | Where the project is headed |
+| [FAQ](docs/faq.md) | Common questions |
+| [Troubleshooting](docs/troubleshooting.md) | Fixes for common issues |
 
-# Running Tests
+## Contributing
 
-```
-pytest
-```
+Contributions are welcome. As the project is in beta, architecture discussions and design feedback are especially valuable. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull requests.
 
----
+## License
 
-# Development Roadmap
-
-## v0.1.0-alpha
-
-- RetrievalEntry
-- Similarity Engine
-- In-memory Storage
-- Unit Tests
-
----
-
-## v0.2.0
-
-Public Remem API
-
-```
-Remem()
-
-↓
-
-find_similar()
-
-↓
-
-Storage
-
-↓
-
-Similarity
-```
-
----
-
-## v0.3.0
-
-Execution Engine
-
-Prevent duplicate retrieval work while requests are executing simultaneously.
-
----
-
-## v0.4.0
-
-Work Reuse API
-
-```
-get_or_compute()
-```
-
-The application supplies a callback.
-
-Remem determines whether previous work can be reused.
-
----
-
-## v0.5.0
-
-Persistence Layer
-
-Support durable storage instead of in-memory only.
-
----
-
-## v0.6.0
-
-Performance Optimization
-
-- Faster similarity search
-- Profiling
-- Benchmarking
-- Memory optimization
-
----
-
-## v0.7.0
-
-SDKs
-
-- Python
-- Java
-- Rust
-
----
-
-## v1.0.0
-
-Production-ready AI Work Reuse Engine
-
----
-
-# Long-Term Goals
-
-Remem aims to support:
-
-- Retrieval reuse
-- Agent memory reuse
-- Prompt context reuse
-- SQL query reuse
-- Tool execution reuse
-- Knowledge versioning
-- Distributed deployments
-- High-performance storage engine
-- Rust acceleration
-
----
-
-# Why Not Just Use Redis?
-
-Redis is an excellent key-value cache.
-
-Remem solves a different problem.
-
-Redis answers:
-
-> "Have I seen this exact key before?"
-
-Remem aims to answer:
-
-> "Have I already performed similar expensive AI work before?"
-
-Instead of exact key matching, Remem focuses on semantic similarity and work reuse.
-
----
-
-# Learning Goals
-
-Remem is also a personal engineering journey.
-
-This project is being built from first principles to deeply understand:
-
-- Distributed systems
-- Storage engines
-- Database internals
-- Concurrency
-- Memory management
-- Networking
-- Performance optimization
-- AI infrastructure
-- Open-source engineering
-
-The goal is not simply to build another cache.
-
-The goal is to build a useful infrastructure project while understanding every layer involved.
-
----
-
-# Contributing
-
-Contributions are welcome.
-
-As the project is still in its early stages, architecture discussions and feedback are especially valuable.
-
-Please read `CONTRIBUTING.md` before opening issues or pull requests.
-
----
-
-# License
-
-Licensed under the Apache License 2.0.
-
-See the `LICENSE` file for details.
-
----
-
-# Project Status
-
-⚠️ **Early Alpha**
-
-The project is under active development.
-
-Breaking API changes are expected until the first stable release.
-
----
+Licensed under the [Apache License 2.0](LICENSE).
 
 ## Author
 
-**Harshvardhan Singh**
+**Harshvardhan Singh** — building Remem as an open-source AI infrastructure project to explore distributed systems, storage engines, and high-performance backend engineering.
 
-Building Remem as an open-source AI infrastructure project to explore distributed systems, storage engines, and high-performance backend engineering.
+If this project is useful to you, consider giving it a star and following its progress.
 
-If this project interests you, consider giving it a ⭐ and following its progress.
+---
+
+<p align="center">⭐ Star the repository if you find Remem useful.</p>

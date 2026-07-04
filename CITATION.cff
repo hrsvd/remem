@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+
+title: "Remem"
+
+message: >
+  If you use Remem in your research, publication, or production system,
+  please cite it using the metadata below.
+
+type: software
+
+authors:
+  - family-names: "Singh"
+    given-names: "Harshvardhan"
+
+repository-code: "https://github.com/harshvardhansingh7/remem"
+
+url: "https://github.com/harshvardhansingh7/remem"
+
+license: "Apache-2.0"
+
+version: "1.0.0-beta"
+
+date-released: "2026-07-04"
+
+abstract: >
+  Remem is an AI-native work reuse engine that reduces latency and inference
+  cost in Retrieval-Augmented Generation (RAG), AI agent, and LLM applications
+  by intelligently reusing previous executions through semantic similarity and
+  policy-aware decision making.
+
+keywords:
+  - AI Infrastructure
+  - Semantic Cache
+  - LLM
+  - RAG
+  - AI Agents
+  - Generative AI
+  - Vector Search
+  - Embeddings
+  - Machine Learning
+  - Python
