@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
-  <img alt="Version" src="https://img.shields.io/badge/Version-v1.0.0--beta-orange">
+  <img alt="Version" src="https://img.shields.io/badge/Version-v1.0.0-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
   <img alt="PyPI" src="https://img.shields.io/badge/PyPI-remem--ai-blue">
 </p>
