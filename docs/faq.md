@@ -77,23 +77,23 @@ Support for additional providers will continue to expand.
 
 The storage layer is intentionally modular.
 
-Current and planned storage options include:
+Currently implemented storage options are:
 
-* Local persistence
-* SQLite
-* PostgreSQL
-* Redis
-* Custom storage implementations
+* `JsonStorage` for local JSON-file persistence
+* `InMemoryStorage` for volatile in-process storage
+* Custom storage implementations via `StorageInterface`
+
+SQLite, PostgreSQL, Redis, and cloud/object storage backends are planned or can be implemented by users as custom backends, but they do not ship as built-in backends today.
 
 ---
 
 ## Can I use Remem in production?
 
-The project is actively evolving.
+Remem is currently a beta project intended for early adopters and experimental production evaluation.
 
-Production readiness depends on the specific release version.
+The current implementation is most appropriate for single-process or low-concurrency workloads where local JSON persistence or in-memory storage is acceptable. For high-throughput, multi-process, distributed, or strict durability requirements, use caution and consider implementing a custom storage backend with appropriate locking and operational guarantees.
 
-Always refer to the latest GitHub Release notes before deploying Remem in production environments.
+Always refer to the latest release notes before deploying Remem in production environments.
 
 ---
 
@@ -117,10 +117,9 @@ Not always.
 Depending on compatibility, Remem may reuse:
 
 * Retrieval results
-* Intermediate pipeline outputs
 * Final generated responses
 
-The reuse strategy depends on project configuration and policy decisions.
+In the current API, retrieval reuse means Remem returns cached `references` such as document or chunk IDs. Full response reuse means Remem returns the cached `response`. Arbitrary intermediate pipeline stages are not modeled as separate first-class cache entries yet.
 
 ---
 

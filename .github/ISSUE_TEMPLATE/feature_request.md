@@ -1,11 +1,10 @@
 ---
-
 name: Feature Request
 about: Suggest an improvement or new capability for Remem.
 title: "[Feature]: "
 labels: enhancement
 assignees: ""
--------------
+---
 
 # Problem
 
@@ -26,6 +25,10 @@ Describe any alternatives you have considered.
 ## Use Case
 
 Explain how this feature would be used.
+
+## Scope
+
+If this relates to storage, similarity search, policy behavior, metrics, documentation, or developer experience, mention that here.
 
 ## Additional Context
 

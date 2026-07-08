@@ -1,11 +1,10 @@
 ---
-
 name: Bug Report
 about: Report an unexpected behavior or defect in Remem.
 title: "[Bug]: "
 labels: bug
 assignees: ""
--------------
+---
 
 # Bug Description
 
@@ -31,6 +30,7 @@ Describe what actually happened.
 * Python Version:
 * Remem Version:
 * Installation Method (PyPI / Source):
+* Storage Backend (`JsonStorage`, `InMemoryStorage`, custom):
 
 ## Minimal Reproducible Example
 

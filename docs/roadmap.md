@@ -6,7 +6,7 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 
 | Version | Focus | Status |
 |---|---|---|
-| v1.0.0-beta | Production-ready AI work reuse engine | **Current release** |
+| v1.0.0-beta | Local-first AI work reuse engine for early adopters | **Current release** |
 | v1.0.0 | Stable release with production hardening | Planned |
 | v1.1.0 | Approximate Nearest Neighbor (ANN) search | Planned |
 | v1.2.0 | Distributed semantic cache | Planned |
@@ -25,8 +25,15 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 - Built-in observability and metrics
 - Python SDK
 - PyPI distribution
+- Unit tests for persistence, similarity, and policy behavior
 
 **Planned**
+
+*Production hardening*
+- Broader unit and integration test coverage
+- Clearer release validation checklist
+- Documented production deployment guidance
+- Python 3.10 coverage in CI
 
 *Performance*
 - Approximate Nearest Neighbor (ANN) search
@@ -42,6 +49,7 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 - Improved configuration ergonomics
 - CLI support
 - Richer examples and documentation
+- Documentation link checking in CI
 
 ## Version 2.x — Production Deployments
 
