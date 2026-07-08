@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/quickstart.md">Quickstart</a> ·
+  <a href="docs/QuickStart.md">Quickstart</a> ·
   <a href="docs/api.md">API Reference</a> ·
   <a href="docs/architecture.md">Architecture</a> ·
   <a href="docs/benchmarks.md">Benchmarks</a> ·
@@ -70,7 +70,7 @@ For the full decision model, thresholds, and configuration options, see the [Arc
 - **Configurable reuse policy** — tune thresholds and constraints to match your application
 - **Durable persistence** — a file-backed store that survives process restarts, with atomic writes
 - **In-memory mode** — zero-disk-I/O storage for tests, notebooks, and short-lived jobs
-- **Pluggable storage** — bring your own backend (Redis, Postgres, S3, or anything else)
+- **Pluggable storage** — bring your own backend by implementing `StorageInterface`
 - **Built-in telemetry** — hit rate, reuse breakdown, and average similarity, out of the box
 - **Minimal footprint** — a single runtime dependency (`numpy`)
 
@@ -114,19 +114,34 @@ outcome = client.get_or_compute(
 print(outcome.result)   # cached or freshly computed — Remem decides
 ```
 
-New to Remem? Start with the [5-minute Quickstart](docs/quickstart.md). For the complete method-by-method reference, see the [API Reference](docs/api.md).
+New to Remem? Start with the [5-minute Quickstart](docs/QuickStart.md). For the complete method-by-method reference, see the [API Reference](docs/api.md).
 
 ## Documentation
 
 | Guide | Description |
 |---|---|
-| [Quickstart](docs/quickstart.md) | Get a working integration in under five minutes |
+| [Quickstart](docs/QuickStart.md) | Get a working integration in under five minutes |
 | [API Reference](docs/api.md) | Every class, method, and configuration option |
 | [Architecture](docs/architecture.md) | How Remem is designed internally |
 | [Benchmarks](docs/benchmarks.md) | What Remem measures and why |
 | [Roadmap](docs/roadmap.md) | Where the project is headed |
 | [FAQ](docs/faq.md) | Common questions |
 | [Troubleshooting](docs/troubleshooting.md) | Fixes for common issues |
+
+## Testing
+
+From a source checkout, install development dependencies and run the test suite:
+
+```bash
+pip install -e ".[dev]"
+python -m pytest -v
+```
+
+The tests cover persistence, serialization, similarity scoring, and policy filtering. If `pytest` is unavailable in a local environment, the current tests can also be run with:
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## Contributing
 

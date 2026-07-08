@@ -1,6 +1,6 @@
 # API Reference
 
-This document describes every public class, method, and configuration option in Remem. It assumes you've already completed the [Quickstart](quickstart.md).
+This document describes every public class, method, and configuration option in Remem. It assumes you've already completed the [Quickstart](QuickStart.md).
 
 The public API follows [Semantic Versioning](https://semver.org/). Breaking changes will only occur in major releases.
 
@@ -285,7 +285,7 @@ record.created_at   # datetime
 |---|---|---|---|
 | `JsonStorage` (default) | `from remem import JsonStorage` | Durable — survives restarts | Production, any long-running app |
 | `InMemoryStorage` | `from remem import InMemoryStorage` | Volatile — lost on exit | Tests, notebooks, short-lived jobs |
-| Custom | Subclass `StorageInterface` | Your choice | Redis, Postgres, S3, or any other system |
+| Custom | Subclass `StorageInterface` | Your choice | Redis, Postgres, S3, or another system you implement |
 
 **`JsonStorage` details:**
 
@@ -305,7 +305,7 @@ client = Client(storage_backend=JsonStorage(filepath="/var/data/remem_cache.json
 ```python
 from remem import StorageInterface
 
-class MyRedisStorage(StorageInterface):
+class MyStorage(StorageInterface):
     def put(self, record: ExecutionRecord) -> None: ...
     def get(self, entry_id: UUID) -> ExecutionRecord | None: ...
     def delete(self, entry_id: UUID) -> bool: ...

@@ -23,6 +23,7 @@ This guide walks you through installation, first integration, and everything you
 11. [Common Patterns](#11-common-patterns)
 12. [Common Mistakes](#12-common-mistakes)
 13. [Frequently Asked Questions](#13-frequently-asked-questions)
+14. [Running Tests from Source](#14-running-tests-from-source)
 
 ---
 
@@ -81,7 +82,7 @@ After installation, confirm the package is available and on the expected version
 
 ```python
 import remem
-print(remem.__version__)   # 0.6.0
+print(remem.__version__)   # 1.0.0
 ```
 
 Or from a terminal:
@@ -93,7 +94,7 @@ python -c "import remem; print(remem.__version__)"
 Expected output:
 
 ```
-0.6.0
+1.0.0
 ```
 
 If you see `ModuleNotFoundError`, double-check that the correct virtual environment is activated.
@@ -173,7 +174,7 @@ The file is created on first write and loaded automatically on startup.
 ### `pyproject.toml`
 
 If you are working from source, `pyproject.toml` contains:
-- Package metadata (`name = "remem-ai"`, `version = "0.6.0"`)
+- Package metadata (`name = "remem-ai"`, with the version read from `remem.__version__`)
 - Dependency declarations (`numpy>=1.21`)
 - Development extras (`pytest`, `ruff`)
 - Ruff linting and formatting configuration
@@ -329,7 +330,9 @@ remem/
 │       ├── events.py
 │       └── snapshot.py
 ├── tests/
-│   └── test_persistence.py
+│   ├── test_persistence.py
+│   ├── test_policy.py
+│   └── test_similarity.py
 ├── pyproject.toml
 └── README.md
 ```
@@ -604,7 +607,7 @@ record.created_at   # datetime
 |---|---|---|---|
 | `JsonStorage` | `from remem import JsonStorage` | Durable (file on disk) | Production, any persistent workload |
 | `InMemoryStorage` | `from remem import InMemoryStorage` | Volatile (RAM only) | Tests, notebooks, CI pipelines |
-| Custom | Subclass `StorageInterface` | Your choice | Redis, Postgres, S3, etc. |
+| Custom | Subclass `StorageInterface` | Your choice | Redis, Postgres, S3, or another system you implement |
 
 **`JsonStorage` details:**
 - Default file path: `remem_store.json` in the current working directory
@@ -840,3 +843,28 @@ Check that `ExecutionContext` fields match exactly. A difference in `namespace`,
 ---
 
 *Apache License 2.0 — Remem is open source. Contributions and feedback welcome.*
+
+---
+
+## 14. Running Tests from Source
+
+If you cloned the repository, install the development extras before running the full suite:
+
+```bash
+pip install -e ".[dev]"
+python -m pytest -v
+```
+
+The current suite covers:
+
+- JSON persistence and serializer round trips
+- Similarity scoring and threshold behavior
+- Metadata policy compatibility and candidate filtering
+
+If your local environment does not have `pytest`, the same `unittest`-based tests can be run with:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The CI workflow runs the unit tests and the RAG example on Python 3.11 and 3.12. Python 3.10 is supported by package metadata, but adding it to the CI matrix is still a recommended follow-up.
