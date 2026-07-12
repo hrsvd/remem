@@ -1,9 +1,9 @@
 import unittest
 
 from remem.models.execution_context import ExecutionContext
+from remem.models.execution_record import ExecutionRecord
 from remem.reuse.matcher import MetadataMatcher
 from remem.reuse.policy import ReusePolicy
-from remem.models.execution_record import ExecutionRecord
 
 
 class TestReusePolicy(unittest.TestCase):

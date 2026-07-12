@@ -4,13 +4,13 @@ from uuid import uuid4
 from remem.metrics.collector import MetricsCollector
 from remem.metrics.events import MetricEvent
 from remem.models.execution_context import ExecutionContext
-from remem.models.execution_result import ExecutionResult
 from remem.models.execution_record import ExecutionRecord
+from remem.models.execution_result import ExecutionResult
+from remem.reuse.decision import ReuseDecision, ReuseOutcome
 from remem.reuse.matcher import MetadataMatcher
 from remem.reuse.policy import ReusePolicy
 from remem.similarity.engine import SimilarityEngine
 from remem.storage.storage import StorageInterface
-from remem.reuse.decision import ReuseDecision, ReuseOutcome
 
 
 class ReuseEngine:
@@ -36,8 +36,12 @@ class ReuseEngine:
     ):
         """Shared metadata-filter + similarity scan used by both public methods."""
         all_entries = self.storage.all()
-        compatible = MetadataMatcher.filter_candidates(all_entries, context, self.policy)
-        return self.similarity.find_best_match(query_embedding, compatible, threshold=threshold)
+        compatible = MetadataMatcher.filter_candidates(
+            all_entries, context, self.policy
+        )
+        return self.similarity.find_best_match(
+            query_embedding, compatible, threshold=threshold
+        )
 
     def check(
         self,
@@ -120,13 +124,15 @@ class ReuseEngine:
         if not best_match:
             self.metrics.record(MetricEvent.MISS)
             exec_result = compute_callback()
-            self.storage.put(ExecutionRecord(
-                id=uuid4(),
-                embedding=query_embedding,
-                references=exec_result.references,
-                response=exec_result.response,
-                context=context,
-            ))
+            self.storage.put(
+                ExecutionRecord(
+                    id=uuid4(),
+                    embedding=query_embedding,
+                    references=exec_result.references,
+                    response=exec_result.response,
+                    context=context,
+                )
+            )
             return ReuseOutcome(
                 result=exec_result.response,
                 decision=ReuseDecision.MISS,
@@ -140,7 +146,10 @@ class ReuseEngine:
         score = best_match.score
 
         # Full hit: return cached LLM response, skip pipeline entirely
-        if score >= self.policy.response_threshold and matched_entry.response is not None:
+        if (
+            score >= self.policy.response_threshold
+            and matched_entry.response is not None
+        ):
             self.metrics.record(MetricEvent.HIT, similarity=score)
             self.metrics.record(MetricEvent.RESPONSE_REUSED)
             return ReuseOutcome(
@@ -156,13 +165,15 @@ class ReuseEngine:
         self.metrics.record(MetricEvent.HIT, similarity=score)
         self.metrics.record(MetricEvent.RETRIEVAL_REUSED)
         computed_exec = compute_callback()
-        self.storage.put(ExecutionRecord(
-            id=uuid4(),
-            embedding=query_embedding,
-            references=computed_exec.references,
-            response=computed_exec.response,
-            context=context,
-        ))
+        self.storage.put(
+            ExecutionRecord(
+                id=uuid4(),
+                embedding=query_embedding,
+                references=computed_exec.references,
+                response=computed_exec.response,
+                context=context,
+            )
+        )
         return ReuseOutcome(
             result=computed_exec.response,
             decision=ReuseDecision.RETRIEVAL_REUSED,

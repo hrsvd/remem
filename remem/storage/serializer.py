@@ -25,7 +25,9 @@ class Serializer:
                 "prompt_version": record.context.prompt_version,
                 "model": record.context.model,
                 "metadata": record.context.metadata,
-            } if record.context else None,
+            }
+            if record.context
+            else None,
         }
 
     @staticmethod

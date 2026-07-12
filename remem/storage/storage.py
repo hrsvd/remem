@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from uuid import UUID
+
 from remem.models.execution_record import ExecutionRecord
 
 

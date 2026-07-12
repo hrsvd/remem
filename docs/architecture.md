@@ -84,6 +84,10 @@ Located in `remem/similarity/engine.py`, backed by `remem/similarity/metrics.py`
 - **Current implementation:** exact cosine similarity search
 - **Planned:** Approximate Nearest Neighbor (ANN) search, HNSW indexing, hybrid retrieval — see the [Roadmap](roadmap.md)
 
+The default similarity backend is dependency-free exhaustive cosine search. Set `similarity_backend="hnsw"` to use the optional USearch HNSW implementation (`pip install "remem-ai[ann]"`). HNSW cosine distance is converted to cosine similarity (`similarity = 1 - distance`), preserving the existing `[-1.0, 1.0]` thresholds and `ReuseOutcome.similarity_score` semantics. Execution records remain authoritative in storage; the in-memory ANN index rebuilds when candidates change and after restart or reload, so no separate index file can become stale.
+
+USearch was selected because it provides lightweight prebuilt Python wheels across common platforms while using HNSW internally. Keeping it optional leaves the base package and legacy exact behavior unchanged. Higher `AnnConfig.ef_search` improves approximate-search recall at the cost of query latency; no benchmark claim is made here.
+
 ### Storage Layer
 
 Abstracted behind `StorageInterface` (`remem/storage/storage.py`), so the reuse engine never depends on a specific persistence mechanism.

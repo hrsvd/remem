@@ -1,14 +1,14 @@
-import os
 import json
+import os
 import time
 from typing import List, Optional
 from uuid import UUID
 
 from remem.models.execution_record import ExecutionRecord
-from remem.storage.storage import StorageInterface
+from remem.storage.exceptions import CorruptedSnapshotException, PersistenceException
 from remem.storage.serializer import Serializer
 from remem.storage.snapshot import StorageSnapshot
-from remem.storage.exceptions import PersistenceException, CorruptedSnapshotException
+from remem.storage.storage import StorageInterface
 
 
 class JsonStorage(StorageInterface):
@@ -53,15 +53,19 @@ class JsonStorage(StorageInterface):
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
                 payload = json.load(f)
-                
+
             raw_records = payload.get("records", [])
             records = Serializer.deserialize_many(raw_records)
-            
+
             self._memory_store = {r.id: r for r in records}
         except json.JSONDecodeError as e:
-            raise CorruptedSnapshotException(f"Failed to parse corrupt snapshot JSON: {e}") from e
+            raise CorruptedSnapshotException(
+                f"Failed to parse corrupt snapshot JSON: {e}"
+            ) from e
         except Exception as e:
-            raise PersistenceException(f"Critical error loading storage snapshot: {e}") from e
+            raise PersistenceException(
+                f"Critical error loading storage snapshot: {e}"
+            ) from e
 
     def save(self) -> None:
         """Flushes in-memory data to disk safely via an atomic rename cycle."""
@@ -82,10 +86,14 @@ class JsonStorage(StorageInterface):
         except Exception as e:
             if os.path.exists(temp_filepath):
                 os.remove(temp_filepath)
-            raise PersistenceException(f"Failed to perform atomic storage save: {e}") from e
+            raise PersistenceException(
+                f"Failed to perform atomic storage save: {e}"
+            ) from e
 
     @staticmethod
-    def _atomic_replace(src: str, dst: str, retries: int = 5, delay: float = 0.05) -> None:
+    def _atomic_replace(
+        src: str, dst: str, retries: int = 5, delay: float = 0.05
+    ) -> None:
         """Replaces ``dst`` with ``src`` atomically, retrying on Windows lock errors."""
         for attempt in range(retries):
             try:

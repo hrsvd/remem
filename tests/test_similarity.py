@@ -72,7 +72,9 @@ class TestSimilarityEngine(unittest.TestCase):
             threshold=0.0,
         )
 
-        self.assertEqual([entry.id for entry, _ in matches], [self.high_match.id, self.low_match.id])
+        self.assertEqual(
+            [entry.id for entry, _ in matches], [self.high_match.id, self.low_match.id]
+        )
         self.assertGreaterEqual(matches[0][1], matches[1][1])
 
     def test_find_all_matches_filters_by_threshold(self):

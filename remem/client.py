@@ -1,15 +1,16 @@
-from typing import Callable, Optional
+from typing import Callable, Literal, Optional
 from uuid import UUID
 
+from remem.metrics.collector import MetricsCollector
 from remem.models.execution_context import ExecutionContext
 from remem.models.execution_record import ExecutionRecord
 from remem.models.execution_result import ExecutionResult
-from remem.reuse.policy import ReusePolicy
 from remem.reuse.engine import ReuseEngine, ReuseOutcome
+from remem.reuse.policy import ReusePolicy
 from remem.similarity.engine import SimilarityEngine
-from remem.storage.storage import StorageInterface
+from remem.similarity.index import AnnConfig
 from remem.storage.json_storage import JsonStorage
-from remem.metrics.collector import MetricsCollector
+from remem.storage.storage import StorageInterface
 
 
 class Client:
@@ -19,10 +20,12 @@ class Client:
         self,
         storage_backend: Optional[StorageInterface] = None,
         policy: Optional[ReusePolicy] = None,
+        similarity_backend: Literal["exact", "hnsw"] = "exact",
+        ann_config: Optional[AnnConfig] = None,
     ):
         # Default directly to file-backed JSON persistence or use an injected backend
         self.storage: StorageInterface = storage_backend or JsonStorage()
-        self.similarity = SimilarityEngine()
+        self.similarity = SimilarityEngine(similarity_backend, ann_config)
         self.policy = policy or ReusePolicy()
         self.metrics = MetricsCollector()
         self.reuse_planner = ReuseEngine(
@@ -87,13 +90,16 @@ class Client:
             client.remember(embed(query), answer, references=docs, context=ctx)
         """
         from uuid import uuid4
-        self.storage.put(ExecutionRecord(
-            id=uuid4(),
-            embedding=query_embedding,
-            response=response,
-            references=references or [],
-            context=context or ExecutionContext(),
-        ))
+
+        self.storage.put(
+            ExecutionRecord(
+                id=uuid4(),
+                embedding=query_embedding,
+                response=response,
+                references=references or [],
+                context=context or ExecutionContext(),
+            )
+        )
 
     def store(self, record: ExecutionRecord) -> None:
         """Saves a rich execution record directly."""

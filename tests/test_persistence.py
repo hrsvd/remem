@@ -3,15 +3,14 @@ import unittest
 from uuid import uuid4
 
 from remem import Client
-from remem.models.execution_record import ExecutionRecord
 from remem.models.execution_context import ExecutionContext
+from remem.models.execution_record import ExecutionRecord
+from remem.storage.exceptions import CorruptedSnapshotException
 from remem.storage.json_storage import JsonStorage
 from remem.storage.serializer import Serializer
-from remem.storage.exceptions import CorruptedSnapshotException
 
 
 class TestPersistenceEngine(unittest.TestCase):
-
     def setUp(self):
         self.test_file = "test_store.json"
 
@@ -27,9 +26,11 @@ class TestPersistenceEngine(unittest.TestCase):
             embedding=[0.12, 0.34],
             references=["src.txt"],
             response="Tested response payload.",
-            context=ExecutionContext(namespace="test_ns", kb_version="1.0", prompt_version="2.0")
+            context=ExecutionContext(
+                namespace="test_ns", kb_version="1.0", prompt_version="2.0"
+            ),
         )
-        
+
         dict_data = Serializer.serialize(record)
         recovered = Serializer.deserialize(dict_data)
 
@@ -43,12 +44,14 @@ class TestPersistenceEngine(unittest.TestCase):
 
         # Generate and store 100 entries
         for i in range(100):
-            client.store(ExecutionRecord(
-                embedding=[float(i)/100, 0.0],
-                references=[f"doc_{i}"],
-                response=f"Resp {i}",
-                context=ExecutionContext(namespace="test")
-            ))
+            client.store(
+                ExecutionRecord(
+                    embedding=[float(i) / 100, 0.0],
+                    references=[f"doc_{i}"],
+                    response=f"Resp {i}",
+                    context=ExecutionContext(namespace="test"),
+                )
+            )
 
         self.assertEqual(len(client.all()), 100)
 
@@ -60,7 +63,7 @@ class TestPersistenceEngine(unittest.TestCase):
         # Delete entries and verify persistence
         target_id = reloaded_records[0].id
         reloaded_client.delete(target_id)
-        
+
         post_delete_storage = JsonStorage(filepath=self.test_file)
         post_delete_client = Client(storage_backend=post_delete_storage)
         self.assertEqual(len(post_delete_client.all()), 99)
