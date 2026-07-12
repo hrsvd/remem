@@ -15,7 +15,6 @@ Run it with:
 
 from remem import Client, ExecutionContext, InMemoryStorage, ReuseDecision, ReusePolicy
 
-
 # ---------------------------------------------------------------------------
 # Fake AI stack — replace these with your real embedding model, vector DB, LLM
 # ---------------------------------------------------------------------------
@@ -23,22 +22,30 @@ from remem import Client, ExecutionContext, InMemoryStorage, ReuseDecision, Reus
 # Hard-coded latent vectors over three topics: [leave, refund, general].
 # Your real embedding model (OpenAI, Cohere, etc.) produces these automatically.
 _FAKE_EMBEDDINGS = {
-    "What is our company's vacation policy?":       [1.00, 0.00, 0.20],
-    "How many paid leaves do employees receive?":   [0.99, 0.00, 0.25],  # near-identical -> RESPONSE_REUSED
-    "What is our refund policy?":                   [0.00, 1.00, 0.20],  # different topic -> MISS
-    "Tell me about time off and holiday entitlement": [0.85, 0.00, 0.55], # related -> RETRIEVAL_REUSED
+    "What is our company's vacation policy?": [1.00, 0.00, 0.20],
+    "How many paid leaves do employees receive?": [
+        0.99,
+        0.00,
+        0.25,
+    ],  # near-identical -> RESPONSE_REUSED
+    "What is our refund policy?": [0.00, 1.00, 0.20],  # different topic -> MISS
+    "Tell me about time off and holiday entitlement": [
+        0.85,
+        0.00,
+        0.55,
+    ],  # related -> RETRIEVAL_REUSED
 }
 
 # Fake knowledge base: what your vector DB would return for each topic
 _FAKE_VECTOR_DB = {
-    "leave":   ["hr_handbook#pto", "hr_handbook#leave_policy"],
-    "refund":  ["policy_docs#returns", "policy_docs#refund_window"],
+    "leave": ["hr_handbook#pto", "hr_handbook#leave_policy"],
+    "refund": ["policy_docs#returns", "policy_docs#refund_window"],
 }
 
 # Fake LLM answers per document set (different answers for different topics)
 _FAKE_LLM_ANSWERS = {
-    "leave":   "Employees receive 20 paid leave days per year.",
-    "refund":  "Refunds are processed within 14 business days of return approval.",
+    "leave": "Employees receive 20 paid leave days per year.",
+    "refund": "Refunds are processed within 14 business days of return approval.",
 }
 
 
@@ -48,7 +55,13 @@ def embed(text: str) -> list[float]:
 
 def search_vector_db(query: str) -> list[str]:
     print(f"   [vector-db] searching: {query!r}")
-    topic = "leave" if "leave" in query.lower() or "vacation" in query.lower() or "pto" in query.lower() else "refund"
+    topic = (
+        "leave"
+        if "leave" in query.lower()
+        or "vacation" in query.lower()
+        or "pto" in query.lower()
+        else "refund"
+    )
     return _FAKE_VECTOR_DB.get(topic, ["generic_doc#1"])
 
 
@@ -62,6 +75,7 @@ def call_llm(query: str, documents: list[str]) -> str:
 # The RAG function that uses Remem's explicit check() + remember() API
 # ---------------------------------------------------------------------------
 
+
 def rag_with_remem(query: str, client: Client, context: ExecutionContext) -> str:
     embedding = embed(query)
 
@@ -70,18 +84,22 @@ def rag_with_remem(query: str, client: Client, context: ExecutionContext) -> str
 
     if outcome.decision == ReuseDecision.RESPONSE_REUSED:
         # Full cache hit — skip the entire pipeline
-        print(f"   [remem] RESPONSE_REUSED (sim={outcome.similarity_score:.2f}) — skipped vector-DB and LLM")
+        print(
+            f"   [remem] RESPONSE_REUSED (sim={outcome.similarity_score:.2f}) — skipped vector-DB and LLM"
+        )
         return outcome.result
 
     if outcome.decision == ReuseDecision.RETRIEVAL_REUSED:
         # Partial hit — skip the vector-DB search, just call the LLM
-        print(f"   [remem] RETRIEVAL_REUSED (sim={outcome.similarity_score:.2f}) — skipped vector-DB, calling LLM with cached docs")
+        print(
+            f"   [remem] RETRIEVAL_REUSED (sim={outcome.similarity_score:.2f}) — skipped vector-DB, calling LLM with cached docs"
+        )
         response = call_llm(query, outcome.references)
         client.remember(embedding, response, outcome.references, context=context)
         return response
 
     # MISS — run the full pipeline and store the result
-    print(f"   [remem] MISS — running full pipeline")
+    print("   [remem] MISS — running full pipeline")
     docs = search_vector_db(query)
     response = call_llm(query, docs)
     client.remember(embedding, response, references=docs, context=context)
@@ -92,6 +110,7 @@ def rag_with_remem(query: str, client: Client, context: ExecutionContext) -> str
 # Demo
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     client = Client(
         storage_backend=InMemoryStorage(),  # swap for Client() to persist to disk
@@ -100,10 +119,16 @@ def main() -> None:
     context = ExecutionContext(namespace="hr-bot", kb_version="2024.1", model="gpt-4o")
 
     queries = [
-        ("What is our company's vacation policy?",         "cold start -> full pipeline"),
-        ("How many paid leaves do employees receive?",     "near-identical -> full response reused"),
-        ("What is our refund policy?",                     "different topic -> full pipeline"),
-        ("Tell me about time off and holiday entitlement", "related -> cached docs, fresh LLM"),
+        ("What is our company's vacation policy?", "cold start -> full pipeline"),
+        (
+            "How many paid leaves do employees receive?",
+            "near-identical -> full response reused",
+        ),
+        ("What is our refund policy?", "different topic -> full pipeline"),
+        (
+            "Tell me about time off and holiday entitlement",
+            "related -> cached docs, fresh LLM",
+        ),
     ]
 
     for query, label in queries:

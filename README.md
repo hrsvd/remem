@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
-  <img alt="Version" src="https://img.shields.io/badge/Version-v1.0.0-orange">
+  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0--dev-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
   <img alt="PyPI" src="https://img.shields.io/badge/PyPI-remem--ai-blue">
 </p>
@@ -84,6 +84,12 @@ pip install remem-ai
 
 Remem has a single runtime dependency (`numpy`), which is installed automatically.
 
+For optional HNSW approximate-nearest-neighbor search, install the ANN extra:
+
+```bash
+pip install "remem-ai[ann]"
+```
+
 <details>
 <summary>Installing from source</summary>
 
@@ -115,6 +121,18 @@ print(outcome.result)   # cached or freshly computed — Remem decides
 ```
 
 New to Remem? Start with the [5-minute Quickstart](docs/QuickStart.md). For the complete method-by-method reference, see the [API Reference](docs/api.md).
+
+### Optional ANN search
+
+Exact cosine search remains the default and is best for small caches or when every result must be exhaustive. For larger caches, enable the optional HNSW backend:
+
+```python
+from remem import AnnConfig, Client
+
+client = Client(similarity_backend="hnsw", ann_config=AnnConfig(ef_search=100))
+```
+
+ANN returns the same cosine-similarity score semantics as exact search (`-1.0` to `1.0`); Remem converts the index distance before applying reuse thresholds. The index is derived from stored records and rebuilt automatically after storage reloads or record updates, so no separate index file is persisted. Higher `ef_search` improves recall at the cost of query latency.
 
 ## Documentation
 

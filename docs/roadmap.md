@@ -6,9 +6,9 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 
 | Version | Focus | Status |
 |---|---|---|
-| v1.0.0-beta | Local-first AI work reuse engine for early adopters | **Current release** |
-| v1.0.0 | Stable release with production hardening | Planned |
-| v1.1.0 | Approximate Nearest Neighbor (ANN) search | Planned |
+| v1.0.0-beta | Local-first AI work reuse engine for early adopters | Completed |
+| v1.0.0 | Stable local-first AI work reuse engine | **Current release** |
+| v1.1.0 | Approximate Nearest Neighbor (ANN) search | **In development** |
 | v1.2.0 | Distributed semantic cache | Planned |
 | v1.3.0 | Additional storage backends (Redis, Postgres, S3) | Planned |
 | v1.4.0 | Advanced policy engine with ML-based thresholds | Planned |
@@ -36,8 +36,12 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 - Python 3.10 coverage in CI
 
 *Performance*
-- Approximate Nearest Neighbor (ANN) search
-- HNSW indexing
+- Optional HNSW cosine search with rebuildable in-memory indexes (`1.1.0.dev0`)
+- User-oriented automatic and exact/HNSW search modes
+- Exact cosine reranking of ANN candidates
+- Record-ID lookup without query-time full storage scans
+- Incremental and persistent ANN indexes with consistency recovery
+- Namespace-aware filtering; arbitrary metadata indexing requires further design
 - Faster retrieval and memory optimizations
 
 *Storage*

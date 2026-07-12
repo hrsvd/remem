@@ -1,4 +1,5 @@
 from typing import Optional
+
 from remem.metrics.events import MetricEvent
 from remem.metrics.snapshot import MetricsSnapshot
 

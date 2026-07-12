@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.0.dev0] - Unreleased
+
+### Added
+
+- Optional HNSW approximate-nearest-neighbor search via the `ann` extra.
+- Configurable ANN search settings through `AnnConfig`.
+
+### Changed
+
+- Exact cosine search remains the default; ANN preserves its similarity-score and threshold semantics.
+- Reconciled release documentation and corrected lint configuration for current Ruff versions.
+
+### Known limitations
+
+- HNSW indexes are rebuilt in memory from authoritative storage records and are not persisted.
+- Query-time metadata filtering still enumerates stored records before ANN search.
+- Index insertion, replacement, and deletion are not yet incremental.
+
+---
+
+## [1.0.0] - 2026-07-12
+
+### Changed
+
+- Promoted the first public beta to the stable `1.0.0` release.
+
+---
+
 ## [1.0.0-beta] - 2026-07-04
 
 ### 🎉 First Public Beta Release

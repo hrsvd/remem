@@ -28,6 +28,8 @@ from remem import Client
 Client(
     storage_backend: StorageInterface | None = None,
     policy: ReusePolicy | None = None,
+    similarity_backend: Literal["exact", "hnsw"] = "exact",
+    ann_config: AnnConfig | None = None,
 )
 ```
 
@@ -35,6 +37,23 @@ Client(
 |---|---|---|
 | `storage_backend` | `JsonStorage("remem_store.json")` | Where execution records are persisted. |
 | `policy` | `ReusePolicy()` | Similarity thresholds and metadata constraints. |
+| `similarity_backend` | `"exact"` | Use `"hnsw"` for optional HNSW ANN search; install `remem-ai[ann]` first. |
+| `ann_config` | `None` | Optional `AnnConfig` tuning for the HNSW backend. Ignored for exact search. |
+
+### ANN configuration
+
+`AnnConfig` is exported from `remem` and configures the optional HNSW backend:
+
+```python
+from remem import AnnConfig, Client
+
+client = Client(
+    similarity_backend="hnsw",
+    ann_config=AnnConfig(m=16, ef_construction=200, ef_search=100),
+)
+```
+
+`m` and `ef_construction` tune index construction. `ef_search` increases recall when raised, at the cost of query time. ANN preserves cosine similarity score semantics by converting the backend cosine distance (`1 - distance`) before threshold filtering. The index is in-memory and rebuilds from the configured storage backend after reload, record insertion, deletion, or update.
 
 ### `check(query_embedding, context)`
 

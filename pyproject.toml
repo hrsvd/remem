@@ -44,6 +44,9 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.1",
 ]
+ann = [
+    "usearch>=2.17",
+]
 
 [project.urls]
 Homepage = "https://github.com/harshvardhansingh7/remem"
@@ -65,7 +68,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-select = ["E4", "E7", "E8", "F", "I"]
+select = ["E4", "E7", "E9", "F", "I"]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
