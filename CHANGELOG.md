@@ -7,7 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.1.0.dev6] - Unreleased
+## [1.1.0] - 2026-07-14
+
+### Added
+
+- Optional USearch HNSW candidate retrieval through `remem-ai[ann]`, with
+  inspectable `auto`, `exact_cosine`, and `hnsw_cosine` modes.
+- Exact cosine reranking of ANN candidates, preserving public score and
+  threshold semantics from `-1.0` to `1.0`.
+- Direct ordered record-ID lookup for ANN candidates without query-time full
+  storage scans in the built-in backends.
+- Incremental insert, embedding update, compacting delete, clear, and
+  namespace-move synchronization using stable internal keys.
+- Opt-in persistent namespace indexes with versioned metadata, checksums,
+  validated fast reload, atomic replacement, and deterministic recovery.
+- Namespace-partitioned retrieval and conservative pre-storage filtering for
+  `kb_version`, `prompt_version`, and `model` policy constraints.
+- ANN lifecycle telemetry through `client.ann_index_stats` and recovery details
+  through `client.ann_persistence_recovery_reason`.
+
+### Changed
+
+- `auto` is the default search mode. It selects HNSW only when USearch is
+  installed and otherwise falls back safely to exact cosine.
+- Storage remains authoritative. ANN mutation or persistence failures roll back
+  client-mediated storage changes and rebuild affected derived indexes.
+- CI now covers Python 3.10, 3.11, and 3.12, plus ANN-enabled tests, Ruff,
+  formatting, mypy, distribution builds, and metadata validation.
+
+### Performance
+
+- Normal inserts, updates, and deletes avoid full ANN rebuilds.
+- Valid persistent indexes load without re-adding every vector.
+- Strict namespace queries avoid unrelated namespace indexes, and storage
+  resolves only policy-eligible candidate IDs.
+
+### Fixed
+
+- Corrected public and internal type annotations across exact and ANN search,
+  and added a passing mypy gate for all package modules.
+- Modernized package license metadata to the SPDX form used by current
+  setuptools builds.
+
+### Compatibility and upgrade notes
+
+- Python 3.10 or newer is required.
+- The base installation remains dependency-light and does not require USearch;
+  install `remem-ai[ann]` to enable HNSW.
+- The legacy `similarity_backend="exact"|"hnsw"` argument remains temporarily
+  supported with a `DeprecationWarning`; new code should use `search_mode`.
+- Existing `1.0.0` JSON storage files load without migration. ANN files are
+  derived caches and are created only when `persistence_path` is configured.
+- Arbitrary `ExecutionContext.metadata` remains descriptive and is not an
+  implicit filter. Only fields represented by `ReusePolicy` affect eligibility.
+- Persistent ANN paths support one process owner; cross-process index writers
+  and shared-filesystem coordination are not provided in this release.
+
+---
+
+## [1.1.0.dev6] - 2026-07-14
 
 ### Added
 

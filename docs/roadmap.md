@@ -7,8 +7,8 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 | Version | Focus | Status |
 |---|---|---|
 | v1.0.0-beta | Local-first AI work reuse engine for early adopters | Completed |
-| v1.0.0 | Stable local-first AI work reuse engine | **Current release** |
-| v1.1.0 | Approximate Nearest Neighbor (ANN) search | **In development** |
+| v1.0.0 | Stable local-first AI work reuse engine | Completed |
+| v1.1.0 | Production-ready optional ANN search | **Current release** |
 | v1.2.0 | Distributed semantic cache | Planned |
 | v1.3.0 | Additional storage backends (Redis, Postgres, S3) | Planned |
 | v1.4.0 | Advanced policy engine with ML-based thresholds | Planned |
@@ -26,25 +26,17 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 - Python SDK
 - PyPI distribution
 - Unit tests for persistence, similarity, and policy behavior
+- Optional HNSW candidate retrieval with exact cosine reranking
+- Direct candidate-ID storage lookup without query-time storage scans
+- Incremental and persistent namespace-partitioned ANN indexes
+- Validated fast reload, consistency recovery, and structured-policy filtering
+- Python 3.10, 3.11, and 3.12 CI coverage with lint, type, and package checks
 
 **Planned**
 
-*Production hardening*
-- Broader unit and integration test coverage
-- Clearer release validation checklist
-- Documented production deployment guidance
-- Python 3.10 coverage in CI
-
 *Performance*
-- Optional HNSW cosine search with rebuildable in-memory indexes (`1.1.0.dev0`, completed)
-- User-oriented automatic and exact/HNSW search modes (`1.1.0.dev1`, completed)
-- Exact cosine reranking of ANN candidates (`1.1.0.dev2`, completed)
-- Record-ID lookup without query-time full storage scans (`1.1.0.dev3`, completed)
-- Incremental ANN mutation with consistency recovery (`1.1.0.dev4`, completed)
-- Persistent ANN indexes with validated fast reload (`1.1.0.dev5`, completed)
-- Namespace-aware and structured-policy filtering (`1.1.0.dev6`, completed);
-  arbitrary metadata indexing requires explicit policy semantics and further design
-- Faster retrieval and memory optimizations
+- Arbitrary metadata indexing after explicit policy semantics are designed
+- Further retrieval and memory optimizations
 
 *Storage*
 - SQLite backend

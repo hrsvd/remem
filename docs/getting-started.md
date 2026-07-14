@@ -54,6 +54,13 @@ pip install remem-ai
 
 This installs Remem and its only runtime dependency (`numpy`).
 
+For optional HNSW candidate retrieval, install the ANN extra. The default
+`auto` mode will then select HNSW; without it, `auto` safely uses exact cosine.
+
+```bash
+pip install "remem-ai[ann]"
+```
+
 ### Inside a virtual environment (recommended for projects)
 
 ```bash
@@ -67,12 +74,12 @@ pip install remem-ai
 ### From source (for contributors or to run the examples)
 
 ```bash
-git clone https://github.com/harshvardhansingh7/remem.git
+git clone https://github.com/hrsvd/remem.git
 cd remem
 pip install -e ".[dev]"
 ```
 
-The `[dev]` extra installs `pytest` (for running the test suite) and `ruff` (for linting and formatting). The `-e` flag installs the package in editable mode so code changes are picked up immediately without reinstalling.
+The `[dev]` extra installs pytest, Ruff, mypy, and distribution-validation tools. The `-e` flag installs the package in editable mode so code changes are picked up immediately without reinstalling.
 
 ---
 
@@ -82,7 +89,7 @@ After installation, confirm the package is available and on the expected version
 
 ```python
 import remem
-print(remem.__version__)   # 1.0.0
+print(remem.__version__)   # 1.1.0
 ```
 
 Or from a terminal:
@@ -94,7 +101,7 @@ python -c "import remem; print(remem.__version__)"
 Expected output:
 
 ```
-1.0.0
+1.1.0
 ```
 
 If you see `ModuleNotFoundError`, double-check that the correct virtual environment is activated.
@@ -149,7 +156,7 @@ Remem does not compare every stored record against every new request. Before com
 - `prompt_version` — excludes results generated with a different prompt template
 - `model` — excludes responses from a different LLM
 
-This means you never need to manually invalidate cached results. Bump `kb_version` in your `ExecutionContext` and Remem will naturally route new requests to the full pipeline until the new knowledge base has been queried.
+This means you do not need to delete records to invalidate a knowledge-base generation. Bump `kb_version` in your `ExecutionContext` and Remem will route new requests to the full pipeline until that version has been queried. Arbitrary `context.metadata` values are descriptive only in `1.1.0`; they are not implicit filters.
 
 ---
 
@@ -252,7 +259,7 @@ return answer
 
 ### Step 5 — Add execution context (recommended)
 
-An `ExecutionContext` scopes which stored records are valid candidates for the current request. Without it, Remem considers all stored records regardless of namespace, KB version, or model.
+An `ExecutionContext` scopes which stored records are valid candidates for the current request. If omitted, Remem uses `ExecutionContext()` and still applies the normal policy against its empty namespace, default versions, and `model=None` values.
 
 ```python
 from remem import ExecutionContext
@@ -351,6 +358,10 @@ from remem import Client
 Client(
     storage_backend: StorageInterface | None = None,
     policy: ReusePolicy | None = None,
+    similarity_backend: Literal["exact", "hnsw"] | None = None,
+    ann_config: AnnConfig | None = None,
+    *,
+    search_mode: SearchMode | str = SearchMode.AUTO,
 )
 ```
 
@@ -358,6 +369,9 @@ Client(
 |---|---|---|
 | `storage_backend` | `JsonStorage("remem_store.json")` | Where to persist execution records. |
 | `policy` | `ReusePolicy()` | Similarity thresholds and metadata constraints. |
+| `similarity_backend` | `None` | Deprecated compatibility alias. Prefer `search_mode`. |
+| `ann_config` | `None` | Optional HNSW and persistence configuration. Ignored by exact search. |
+| `search_mode` | `"auto"` | Automatic, forced exact cosine, or forced HNSW cosine. |
 
 ---
 
@@ -375,7 +389,7 @@ outcome: ReuseOutcome = client.check(
 | Parameter | Description |
 |---|---|
 | `query_embedding` | Dense vector from your embedding model for the current request. |
-| `context` | Optional scoping metadata. If omitted, all stored records are candidates. |
+| `context` | Optional scoping metadata. If omitted, `ExecutionContext()` is used and normal policy matching still applies. |
 
 **Returns:** `ReuseOutcome`.
 
@@ -504,7 +518,7 @@ ExecutionContext(
 | `kb_version` | Tracks the knowledge-base version. Bump when documents change. | `"2024-Q4"`, `"v2.1"` |
 | `prompt_version` | Tracks the prompt template version. Bump when the prompt changes significantly. | `"v3"`, `"2024-06"` |
 | `model` | The LLM used to generate the response. Prevents cross-model reuse. | `"gpt-4o"`, `"claude-3-5-sonnet"` |
-| `metadata` | Custom key-value pairs for future custom policy logic. | `{"region": "eu-west-1"}` |
+| `metadata` | Descriptive custom values; not filtered or indexed in `1.1.0`. | `{"region": "eu-west-1"}` |
 
 All fields are optional. An omitted field means the policy does not filter on it.
 
@@ -687,6 +701,27 @@ client = Client(
 )
 ```
 
+### Configure optional ANN persistence
+
+```python
+from remem import AnnConfig, Client
+
+client = Client(
+    search_mode="hnsw_cosine",
+    ann_config=AnnConfig(
+        candidate_count=50,
+        ef_search=100,
+        persistence_path=".remem/records.usearch",
+    ),
+)
+```
+
+HNSW performs candidate discovery only; final scores, ordering, and thresholds
+use exact cosine. Indexes are partitioned by namespace. Persistence is a derived
+cache owned by one process and rebuilds automatically from authoritative storage
+when stale, corrupt, or incompatible. See the [API reference](api.md#ann-configuration)
+and [v1.1 migration guide](migration-1.1.md).
+
 ### Bypass Remem for a single request
 
 Simply do not call `check()`. Run your pipeline normally and optionally call `remember()` to update the store with the fresh result.
@@ -832,7 +867,7 @@ No. Remem is a local Python library. All data is stored in your own process memo
 The defaults (`retrieval_threshold=0.80`, `response_threshold=0.95`) are calibrated for modern text embedding models. If your hit rate is very low, try lowering `retrieval_threshold` to `0.70`. If you are getting incorrect responses served from cache, raise `response_threshold` to `0.97` or `0.98`.
 
 **Is Remem thread-safe?**
-`InMemoryStorage` uses a plain Python dict and is not thread-safe. `JsonStorage` writes are serialised at the file level via atomic rename, but concurrent writes from multiple threads or processes are not currently coordinated. For concurrent workloads, implement a custom backend with appropriate locking.
+Client-mediated queries and mutations are lifecycle-serialized across threads sharing one `Client`. Direct storage calls bypass that boundary, and multiple clients or processes writing the same storage or ANN path are not coordinated. For those workloads, implement a custom backend with appropriate locking and give each persistent ANN path one process owner.
 
 **Can I pre-populate the cache before users arrive?**
 Yes — use `client.remember()` or `client.store()` to seed the store with known question-answer pairs at startup. See [Common Patterns — Warm up the cache](#11-common-patterns).
@@ -855,16 +890,14 @@ pip install -e ".[dev]"
 python -m pytest -v
 ```
 
+Install `.[ann,dev]` to execute the ANN-enabled cases instead of skipping them.
+
 The current suite covers:
 
 - JSON persistence and serializer round trips
 - Similarity scoring and threshold behavior
 - Metadata policy compatibility and candidate filtering
+- ANN candidate reranking and direct record lookup
+- Incremental mutation, persistence, corruption recovery, and namespace isolation
 
-If your local environment does not have `pytest`, the same `unittest`-based tests can be run with:
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-The CI workflow runs the unit tests and the RAG example on Python 3.11 and 3.12. Python 3.10 is supported by package metadata, but adding it to the CI matrix is still a recommended follow-up.
+CI runs the base install and RAG example on Python 3.10, 3.11, and 3.12, plus an ANN-enabled suite on Python 3.12. A quality job runs Ruff, formatting, mypy, wheel/sdist builds, and distribution metadata validation.

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ dynamic = ["version"]
 description = "An AI Work Reuse Engine — remember expensive AI work and reuse it intelligently."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Harshvardhan Singh" }]
 keywords = [
     "ai",
@@ -23,9 +24,8 @@ keywords = [
     "infrastructure",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -41,17 +41,20 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.0",
+    "mypy>=1.8",
     "pytest>=7.0",
     "ruff>=0.1",
+    "twine>=5.0",
 ]
 ann = [
     "usearch>=2.17",
 ]
 
 [project.urls]
-Homepage = "https://github.com/harshvardhansingh7/remem"
-Repository = "https://github.com/harshvardhansingh7/remem"
-Issues = "https://github.com/harshvardhansingh7/remem/issues"
+Homepage = "https://github.com/hrsvd/remem"
+Repository = "https://github.com/hrsvd/remem"
+Issues = "https://github.com/hrsvd/remem/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "remem.__version__" }
@@ -91,3 +94,10 @@ line-ending = "auto"
 [tool.pytest.ini_options]
 # Correct path configuration for pytest
 pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+follow_imports = "skip"
+ignore_missing_imports = true
+no_site_packages = true

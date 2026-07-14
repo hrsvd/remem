@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 from uuid import UUID
 
 import numpy as np
@@ -141,7 +141,7 @@ class HnswSimilarityIndex:
 
         self._index_type = Index
         self.config = config or AnnConfig()
-        self._index = None
+        self._index: Any = None
         self._records: list[ExecutionRecord] = []
         self._key_by_record_id: dict[UUID, int] = {}
         self._record_id_by_key: dict[int, UUID] = {}

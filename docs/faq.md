@@ -89,9 +89,10 @@ SQLite, PostgreSQL, Redis, and cloud/object storage backends are planned or can 
 
 ## Can I use Remem in production?
 
-Remem is currently a beta project intended for early adopters and experimental production evaluation.
+Remem `1.1.0` is a stable release. Its local-first exact and optional ANN paths
+are suitable for production workloads that fit the documented ownership model.
 
-The current implementation is most appropriate for single-process or low-concurrency workloads where local JSON persistence or in-memory storage is acceptable. For high-throughput, multi-process, distributed, or strict durability requirements, use caution and consider implementing a custom storage backend with appropriate locking and operational guarantees.
+The current implementation is most appropriate for a single process using local JSON or in-memory storage. Threads sharing one `Client` are lifecycle-serialized, but multi-process index writers, distributed coordination, and strict database-grade durability are outside this release. For those requirements, implement a custom storage backend and keep ANN persistence owned by one process.
 
 Always refer to the latest release notes before deploying Remem in production environments.
 
@@ -107,6 +108,21 @@ Reuse decisions are based on multiple factors, including:
 * User-defined constraints
 
 A high similarity score alone does not guarantee reuse.
+
+The built-in policy supports `namespace`, `kb_version`, `prompt_version`, and
+`model`. Arbitrary `ExecutionContext.metadata` values are stored but are not
+implicit filters in `1.1.0`.
+
+---
+
+## Is HNSW required?
+
+No. `pip install remem-ai` keeps exact cosine search and has no USearch
+dependency. `pip install "remem-ai[ann]"` enables HNSW. The default `auto` mode
+uses HNSW when installed and otherwise exposes a safe exact-cosine fallback;
+forced `hnsw_cosine` mode fails with installation guidance when unavailable.
+HNSW discovers candidates only. Exact cosine determines final ordering, scores,
+and thresholds.
 
 ---
 
@@ -153,7 +169,6 @@ Every contribution—large or small—is appreciated.
 
 The long-term vision for Remem includes:
 
-* Approximate Nearest Neighbor (ANN) search
 * Distributed semantic caching
 * Advanced policy engines
 * Cloud-native deployments

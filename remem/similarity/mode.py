@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class SearchModeResolution:
 
 def resolve_search_mode(
     search_mode: SearchMode | str,
-) -> tuple[SearchModeResolution, str]:
+) -> tuple[SearchModeResolution, Literal["exact", "hnsw"]]:
     """Resolve a public mode to the internal similarity backend name."""
 
     try:
