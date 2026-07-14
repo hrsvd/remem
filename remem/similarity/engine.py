@@ -29,6 +29,7 @@ class SimilarityEngine:
         backend: Literal["exact", "hnsw"] = "exact",
         ann_config: Optional[AnnConfig] = None,
     ) -> None:
+        self._index: ExactSimilarityIndex | PartitionedHnswSimilarityIndex
         if backend == "exact":
             self._index = ExactSimilarityIndex()
         elif backend == "hnsw":
@@ -40,20 +41,20 @@ class SimilarityEngine:
     def rebuild(self, entries: Sequence[ExecutionRecord]) -> None:
         """Rebuild derived ANN state; exact search has no derived state."""
 
-        if self.backend == "hnsw":
+        if isinstance(self._index, PartitionedHnswSimilarityIndex):
             self._index.rebuild(entries)
 
     def initialize(self, entries: Sequence[ExecutionRecord]) -> None:
         """Load or derive initial ANN state; exact search has no state."""
 
-        if self.backend == "hnsw":
+        if isinstance(self._index, PartitionedHnswSimilarityIndex):
             self._index.initialize(entries)
 
     @property
     def persistence_recovery_reason(self) -> Optional[str]:
         """Explain why persistent ANN state was rebuilt, when applicable."""
 
-        if self.backend != "hnsw":
+        if not isinstance(self._index, PartitionedHnswSimilarityIndex):
             return None
         return self._index.persistence_recovery_reason
 
@@ -61,28 +62,28 @@ class SimilarityEngine:
     def ann_index_stats(self) -> Optional[AnnIndexStats]:
         """Return ANN lifecycle counters, or ``None`` for exact search."""
 
-        if self.backend != "hnsw":
+        if not isinstance(self._index, PartitionedHnswSimilarityIndex):
             return None
         return self._index.stats
 
     def upsert(self, record: ExecutionRecord) -> str:
         """Incrementally insert or replace one ANN record."""
 
-        if self.backend != "hnsw":
+        if not isinstance(self._index, PartitionedHnswSimilarityIndex):
             return "unchanged"
         return self._index.upsert(record)
 
     def delete(self, record_id: UUID) -> bool:
         """Incrementally remove one ANN record."""
 
-        if self.backend != "hnsw":
+        if not isinstance(self._index, PartitionedHnswSimilarityIndex):
             return False
         return self._index.delete(record_id)
 
     def clear(self) -> None:
         """Clear all derived ANN state."""
 
-        if self.backend == "hnsw":
+        if isinstance(self._index, PartitionedHnswSimilarityIndex):
             self._index.clear()
 
     def find_candidate_ids(
@@ -95,7 +96,7 @@ class SimilarityEngine:
     ) -> list[UUID]:
         """Discover ANN candidate IDs without resolving storage records."""
 
-        if self.backend != "hnsw":
+        if not isinstance(self._index, PartitionedHnswSimilarityIndex):
             raise RuntimeError("Candidate ID discovery is available only for HNSW.")
         return self._index.candidate_ids(
             query_embedding,

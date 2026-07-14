@@ -185,7 +185,7 @@ class ReuseEngine:
         self,
         query_embedding: list[float],
         context: ExecutionContext,
-    ) -> ReuseDecision:
+    ) -> ReuseOutcome:
         """Returns the reuse decision and any cached artifacts without running any callback.
 
         The caller inspects the decision and routes accordingly:

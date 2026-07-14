@@ -8,10 +8,17 @@ Get from zero to a working integration in under five minutes.
 pip install remem-ai
 ```
 
+The base install uses exact cosine search. To let the default `auto` mode use
+HNSW candidate retrieval when available, install the optional ANN extra:
+
+```bash
+pip install "remem-ai[ann]"
+```
+
 To also run the bundled examples and tests, clone the repository instead:
 
 ```bash
-git clone https://github.com/harshvardhansingh7/remem.git
+git clone https://github.com/hrsvd/remem.git
 cd remem
 pip install -e ".[dev]"
 ```
@@ -31,7 +38,7 @@ If this raises `ModuleNotFoundError`, confirm the correct virtual environment is
 ```python
 from remem import Client
 
-client = Client()   # persists to remem_store.json by default
+client = Client()   # persists records; auto selects HNSW only when installed
 ```
 
 Prefer nothing written to disk (useful for tests and notebooks)?
@@ -125,6 +132,10 @@ python examples/persistent_storage.py  # durable storage across a simulated rest
 ```
 
 Both examples use fake embeddings and a fake LLM, so they run with no external dependencies.
+
+For explicit search modes, persistent ANN configuration, and namespace
+behavior, see [ANN configuration](api.md#ann-configuration). HNSW discovers
+candidates, but final ordering and thresholds always use exact cosine scores.
 
 ## What to Read Next
 

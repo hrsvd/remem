@@ -2,6 +2,12 @@
 
 ## Errors
 
+**Forced HNSW mode says USearch is unavailable**
+Install the optional dependency with `pip install "remem-ai[ann]"`, or use
+`search_mode="exact_cosine"`. The default `auto` mode does not fail when
+USearch is absent; it exposes `client.search_fallback_reason` and uses exact
+cosine safely.
+
 **`CorruptedSnapshotException` on startup**
 The JSON store file is malformed. Delete `remem_store.json` (or your custom path) to start fresh. This should not happen under normal operation — `JsonStorage` uses atomic writes to prevent mid-save corruption.
 
@@ -9,6 +15,10 @@ The JSON store file is malformed. Delete `remem_store.json` (or your custom path
 Inspect `client.ann_persistence_recovery_reason`. Remem rebuilds automatically when configured metadata or a native namespace index is missing, stale relative to storage, corrupt, interrupted, or incompatible with the current HNSW configuration or embedding dimension. Only affected namespace partitions rebuild. After recovery, `client.ann_index_stats.rebuild_count` is incremented and the cache is rewritten; the next clean restart should report one load per non-empty namespace partition and zero rebuilds.
 
 Do not share one `persistence_path` among concurrent processes. Use one path per process/storage owner, or disable ANN persistence. If the configured directory is not writable, mutations raise `AnnMutationError` after attempting storage rollback and deterministic index recovery.
+
+Persistent ANN files are derived caches. Keep the authoritative JSON or custom
+storage data during recovery; deleting only the ANN files is safe because Remem
+will rebuild them on the next HNSW client initialization.
 
 ## Unexpected Behavior
 

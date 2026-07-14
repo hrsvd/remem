@@ -17,7 +17,7 @@ class JsonStorage(StorageInterface):
 
     def __init__(self, filepath: str = "remem_store.json"):
         self.filepath = filepath
-        self._memory_store = {}
+        self._memory_store: dict[UUID, ExecutionRecord] = {}
         self.load()
 
     def put(self, record: ExecutionRecord) -> None:

@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
-  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0.dev6-orange">
+  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
   <img alt="PyPI" src="https://img.shields.io/badge/PyPI-remem--ai-blue">
 </p>
@@ -67,6 +67,9 @@ For the full decision model, thresholds, and configuration options, see the [Arc
 - **Three-level reuse engine** — full response reuse, partial retrieval reuse, or a clean miss
 - **Semantic similarity matching** — cosine similarity over embedding vectors, no exact-match required
 - **Context-aware filtering** — namespace, knowledge-base version, prompt version, and model constraints are respected before anything is reused
+- **Optional production ANN path** — HNSW candidate discovery with exact cosine reranking and safe exact-only fallback
+- **Incremental, persistent indexes** — client-mediated mutations synchronize immediately; validated indexes fast-load across restarts
+- **Namespace-partitioned retrieval** — strict namespace queries avoid unrelated partitions before policy filtering and storage lookup
 - **Configurable reuse policy** — tune thresholds and constraints to match your application
 - **Durable persistence** — a file-backed store that survives process restarts, with atomic writes
 - **In-memory mode** — zero-disk-I/O storage for tests, notebooks, and short-lived jobs
@@ -96,7 +99,7 @@ pip install "remem-ai[ann]"
 ```bash
 git clone https://github.com/hrsvd/remem.git
 cd remem
-pip install -e ".[dev]"    # editable install with pytest and ruff
+pip install -e ".[dev]"    # pytest, Ruff, mypy, build, and metadata checks
 ```
 </details>
 
@@ -151,6 +154,8 @@ Client-mediated inserts, embedding replacements, and deletions update HNSW incre
 
 HNSW is partitioned by `ExecutionContext.namespace`. With the default strict policy, queries search only the matching namespace. Within it, Remem applies `kb_version`, `prompt_version`, and `model` eligibility before storage lookup and expands ANN discovery geometrically until it has enough eligible candidates or exhausts the partition. This avoids false misses caused by a fixed global overfetch multiplier while keeping final scoring exact. If `require_same_namespace=False`, all namespace partitions are searched and their eligible candidates are exact-reranked together. Arbitrary `ExecutionContext.metadata` is not an implicit filter; only fields explicitly represented by `ReusePolicy` affect eligibility.
 
+Upgrading from `1.0.0` requires no JSON storage migration. See the [v1.1 migration guide](docs/migration-1.1.md) for search-mode adoption, optional persistence, compatibility notes, and operational limits.
+
 ## Documentation
 
 | Guide | Description |
@@ -162,6 +167,7 @@ HNSW is partitioned by `ExecutionContext.namespace`. With the default strict pol
 | [Roadmap](docs/roadmap.md) | Where the project is headed |
 | [FAQ](docs/faq.md) | Common questions |
 | [Troubleshooting](docs/troubleshooting.md) | Fixes for common issues |
+| [Migrating to v1.1](docs/migration-1.1.md) | Upgrade, compatibility, persistence, and operational notes |
 
 ## Testing
 
@@ -172,15 +178,19 @@ pip install -e ".[dev]"
 python -m pytest -v
 ```
 
-The tests cover persistence, serialization, similarity scoring, and policy filtering. If `pytest` is unavailable in a local environment, the current tests can also be run with:
+The tests cover exact and ANN search, persistence, serialization, direct record lookup, incremental mutation, corruption recovery, and policy filtering. Stable-release quality checks are:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy remem
+python -m build
+python -m twine check dist/*
 ```
 
 ## Contributing
 
-Contributions are welcome. As the project is in beta, architecture discussions and design feedback are especially valuable. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull requests.
+Contributions are welcome. Architecture discussions and design feedback are especially valuable. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull requests.
 
 ## License
 

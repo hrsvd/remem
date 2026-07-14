@@ -2,7 +2,7 @@
 
 This document describes every public class, method, and configuration option in Remem. It assumes you've already completed the [Quickstart](QuickStart.md).
 
-The public API follows [Semantic Versioning](https://semver.org/). Breaking changes will only occur in major releases.
+The stable `1.1.0` public API follows [Semantic Versioning](https://semver.org/). Breaking changes will only occur in major releases. Users upgrading from `1.0.0` should also read the [v1.1 migration guide](migration-1.1.md).
 
 ## Table of Contents
 
@@ -75,6 +75,8 @@ On startup, Remem fast-loads only when the metadata format, engine identity, HNS
 HNSW indexes are partitioned by `ExecutionContext.namespace`. The default `ReusePolicy` searches only the matching namespace. When namespace matching is relaxed, all partitions are searched and their eligible candidates are exact-reranked together. Within a selected partition, `kb_version`, `prompt_version`, and `model` constraints are applied before storage lookup. If closer incompatible records fill the initial ANN result, discovery expands geometrically until enough compatible IDs are found or the partition is exhausted; there is no fixed global overfetch multiplier. Sparse compatibility can therefore increase query work up to the size of one selected partition, while storage still fetches only eligible IDs.
 
 Client-mediated record mutations synchronize HNSW incrementally. Inserts allocate stable internal keys; embedding replacements remove and reinsert the native vector under the same key; deletes compact native graph state; and response, reference, KB, prompt, or model-only changes avoid graph mutation. Namespace changes move the record between partitions. Storage commits first. An ANN or persistence failure rolls storage back and rebuilds the affected derived graphs, raising `AnnMutationError` so callers can observe the failed operation. Full rebuilds remain for unpersisted startup, explicit reload, validation failure, and recovery. Operations through one `Client` are lifecycle-locked; direct storage mutation and multi-process writers are outside the supported consistency boundary.
+
+Existing `1.0.0` JSON snapshots remain readable without migration. ANN native and metadata files are optional derived caches, not replacements for record storage. Do not configure multiple processes to write the same `persistence_path`.
 
 ### `check(query_embedding, context)`
 

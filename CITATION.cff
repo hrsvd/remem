@@ -12,15 +12,15 @@ authors:
   - family-names: "Singh"
     given-names: "Harshvardhan"
 
-repository-code: "https://github.com/harshvardhansingh7/remem"
+repository-code: "https://github.com/hrsvd/remem"
 
-url: "https://github.com/harshvardhansingh7/remem"
+url: "https://github.com/hrsvd/remem"
 
 license: "Apache-2.0"
 
-version: "1.0.0-beta"
+version: "1.1.0"
 
-date-released: "2026-07-04"
+date-released: "2026-07-14"
 
 abstract: >
   Remem is an AI-native work reuse engine that reduces latency and inference

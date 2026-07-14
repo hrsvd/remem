@@ -152,13 +152,12 @@ Full field-by-field documentation lives in the [API Reference](api.md).
 
 **Explainable.** Every `ReuseOutcome` carries a `reason` and a `similarity_score` — reuse decisions are never a black box.
 
-**Production-ready.** The architecture is designed to scale from a single local script to a production service, without a rewrite in between.
+**Production-conscious.** Local single-process deployments have explicit consistency and recovery guarantees; distributed ownership remains a separate roadmap concern.
 
 ## Future Architecture
 
 The longer-term direction includes:
 
-- ANN indexes for large-scale similarity search
 - Distributed, multi-process, and multi-node cache coordination
 - Cloud-native storage and synchronization
 - Multi-tenant deployment primitives
