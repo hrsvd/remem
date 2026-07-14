@@ -64,15 +64,17 @@ client = Client(
 )
 ```
 
-`m` and `ef_construction` tune index construction. `ef_search` increases candidate-discovery recall when raised, at the cost of query time. `candidate_count` controls how many likely neighbors HNSW returns for exact cosine reranking; its default is 50. Larger candidate sets can improve recall but increase exact-reranking latency. Final ordering, score values, and threshold filtering use exact cosine. Candidate discovery remains approximate and does not guarantee the same neighbors as exhaustive search.
+`m` and `ef_construction` tune index construction. `ef_search` increases candidate-discovery recall when raised, at the cost of query time. `candidate_count` is the initial eligible-candidate target per selected namespace partition; its default is 50. Larger candidate sets can improve recall but increase exact-reranking latency. Final ordering, score values, and threshold filtering use exact cosine. Candidate discovery remains approximate and does not guarantee the same neighbors as exhaustive search.
 
-`persistence_path` is an optional filesystem path for the native USearch index. Its default is `None`, preserving the in-memory behavior. Exact search ignores this option. With persistence enabled, Remem writes `<path>` and `<path>.meta.json`; the latter contains only index metadata, UUID/key mappings, and hashes, not responses or arbitrary context payloads. Parent directories are created automatically.
+`persistence_path` is an optional filesystem base path for native USearch indexes. Its default is `None`, preserving the in-memory behavior. Exact search ignores this option. The empty namespace uses `<path>` and `<path>.meta.json`; named namespaces use hashed filenames under `<path>.partitions/`, so raw namespace values are not placed in filenames. Metadata files contain only index metadata, UUID/key mappings, and hashes, not responses or arbitrary context payloads. Parent directories are created automatically.
 
 On startup, Remem fast-loads only when the metadata format, engine identity, HNSW configuration, dimension, record/vector fingerprint, UUID/key mapping, native size, and SHA-256 checksum all match authoritative storage. Otherwise it rebuilds and atomically replaces the derived cache. Native data is written to a temporary file and committed before its metadata commit marker, so interruption at either boundary is detected on restart. Temporary files are ignored during reads.
 
-`client.ann_index_stats` is an `AnnIndexStats` value for HNSW and `None` for exact search. It exposes `record_count`, `rebuild_count`, `load_count`, and `persistence_enabled`. A successful persistent restart reports one load and zero rebuilds. `client.ann_persistence_recovery_reason` is `None` after a valid load and contains the validation failure that caused an automatic rebuild otherwise.
+`client.ann_index_stats` is an `AnnIndexStats` value for HNSW and `None` for exact search. It exposes aggregate `record_count`, `rebuild_count`, `load_count`, and `persistence_enabled` values across namespace partitions. A successful persistent restart reports one load per non-empty namespace partition and zero rebuilds. `client.ann_persistence_recovery_reason` is `None` after valid loads and identifies the namespace and validation failure for any automatic rebuild.
 
-Client-mediated record mutations synchronize HNSW incrementally. Inserts allocate stable internal keys; embedding replacements remove and reinsert the native vector under the same key; deletes compact native graph state; and response, reference, or context-only changes avoid graph mutation. Storage commits first. An ANN or persistence failure rolls storage back and rebuilds the derived graph, raising `AnnMutationError` so callers can observe the failed operation. Full rebuilds remain for unpersisted startup, explicit reload, validation failure, and recovery. Operations through one `Client` are lifecycle-locked; direct storage mutation and multi-process writers are outside the supported consistency boundary.
+HNSW indexes are partitioned by `ExecutionContext.namespace`. The default `ReusePolicy` searches only the matching namespace. When namespace matching is relaxed, all partitions are searched and their eligible candidates are exact-reranked together. Within a selected partition, `kb_version`, `prompt_version`, and `model` constraints are applied before storage lookup. If closer incompatible records fill the initial ANN result, discovery expands geometrically until enough compatible IDs are found or the partition is exhausted; there is no fixed global overfetch multiplier. Sparse compatibility can therefore increase query work up to the size of one selected partition, while storage still fetches only eligible IDs.
+
+Client-mediated record mutations synchronize HNSW incrementally. Inserts allocate stable internal keys; embedding replacements remove and reinsert the native vector under the same key; deletes compact native graph state; and response, reference, KB, prompt, or model-only changes avoid graph mutation. Namespace changes move the record between partitions. Storage commits first. An ANN or persistence failure rolls storage back and rebuilds the affected derived graphs, raising `AnnMutationError` so callers can observe the failed operation. Full rebuilds remain for unpersisted startup, explicit reload, validation failure, and recovery. Operations through one `Client` are lifecycle-locked; direct storage mutation and multi-process writers are outside the supported consistency boundary.
 
 ### `check(query_embedding, context)`
 
@@ -88,7 +90,7 @@ outcome: ReuseOutcome = client.check(
 | Parameter | Description |
 |---|---|
 | `query_embedding` | Dense vector from your embedding model for the current request. |
-| `context` | Optional scoping metadata. If omitted, all stored records are candidates. |
+| `context` | Optional scoping metadata. If omitted, a default `ExecutionContext()` is used and normal policy matching still applies. |
 
 **Returns:** [`ReuseOutcome`](#reuseoutcome).
 
@@ -201,7 +203,7 @@ ExecutionContext(
 | `kb_version` | Tracks the knowledge-base version. Bump it when documents change. | `"2024-Q4"`, `"v2.1"` |
 | `prompt_version` | Tracks the prompt template version. Bump it when the prompt changes materially. | `"v3"`, `"2024-06"` |
 | `model` | The LLM used to generate the response. Prevents cross-model reuse. | `"gpt-4o"`, `"claude-3-5-sonnet"` |
-| `metadata` | Custom key-value pairs, reserved for future policy logic. | `{"region": "eu-west-1"}` |
+| `metadata` | Descriptive custom key-value pairs. They are not currently filtered or indexed. | `{"region": "eu-west-1"}` |
 
 All fields are optional. An omitted field is simply not filtered on.
 

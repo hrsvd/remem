@@ -11,10 +11,10 @@ import hashlib
 import json
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
-from typing import Mapping, Optional
+from typing import Callable, Mapping, Optional
 from uuid import UUID
 
 import numpy as np
@@ -293,6 +293,7 @@ class HnswSimilarityIndex:
         self,
         query_embedding: Sequence[float],
         top_k: Optional[int],
+        eligible_ids: Optional[set[UUID]] = None,
     ) -> list[UUID]:
         """Return approximate candidate IDs without resolving stored records."""
 
@@ -300,6 +301,8 @@ class HnswSimilarityIndex:
             if top_k is not None and top_k <= 0:
                 raise ValueError("top_k must be a positive integer when provided.")
             if not self._records:
+                return []
+            if eligible_ids is not None and not eligible_ids:
                 return []
 
             query = self._validate_vector(query_embedding, "query embedding")
@@ -312,20 +315,28 @@ class HnswSimilarityIndex:
             requested = self.config.candidate_count
             if top_k is not None:
                 requested = max(requested, top_k)
+            target = requested
+            if eligible_ids is not None:
+                target = min(target, len(eligible_ids))
             count = min(requested, len(self._records))
-            matches = self._index.search(query, count=count)
-            candidate_ids: list[UUID] = []
-            for label in matches.keys:
-                key = int(label)
-                record_id = self._record_id_by_key.get(key)
-                if record_id is None:
-                    raise AnnIndexStateError(
-                        f"ANN index returned unknown internal label {key}. "
-                        "Rebuild the ANN index from authoritative storage."
-                    )
-                candidate_ids.append(record_id)
+            while True:
+                matches = self._index.search(query, count=count)
+                candidate_ids: list[UUID] = []
+                for label in matches.keys:
+                    key = int(label)
+                    record_id = self._record_id_by_key.get(key)
+                    if record_id is None:
+                        raise AnnIndexStateError(
+                            f"ANN index returned unknown internal label {key}. "
+                            "Rebuild the ANN index from authoritative storage."
+                        )
+                    if eligible_ids is None or record_id in eligible_ids:
+                        candidate_ids.append(record_id)
 
-            return list(dict.fromkeys(candidate_ids))
+                candidate_ids = list(dict.fromkeys(candidate_ids))
+                if len(candidate_ids) >= target or count == len(self._records):
+                    return candidate_ids
+                count = min(len(self._records), max(count + 1, count * 2))
 
     def _synchronize(
         self, entries: Sequence[ExecutionRecord], *, force: bool = False
@@ -600,3 +611,226 @@ class HnswSimilarityIndex:
         if array.ndim != 1 or array.size == 0 or not np.isfinite(array).all():
             raise ValueError(f"{name} must be a non-empty sequence of finite numbers.")
         return array
+
+
+class PartitionedHnswSimilarityIndex:
+    """Namespace-partitioned HNSW indexes with conservative policy filtering."""
+
+    def __init__(self, config: Optional[AnnConfig] = None) -> None:
+        try:
+            from usearch.index import Index  # noqa: F401
+        except ImportError as exc:  # pragma: no cover - exercised without extra
+            raise ImportError(
+                "ANN search requires the optional 'usearch' dependency. "
+                "Install it with: pip install remem-ai[ann]"
+            ) from exc
+        self.config = config or AnnConfig()
+        self._partitions: dict[str, HnswSimilarityIndex] = {}
+        self._namespace_by_record_id: dict[UUID, str] = {}
+        self._lock = RLock()
+
+    @property
+    def stats(self) -> AnnIndexStats:
+        child_stats = [partition.stats for partition in self._partitions.values()]
+        return AnnIndexStats(
+            record_count=sum(stats.record_count for stats in child_stats),
+            rebuild_count=sum(stats.rebuild_count for stats in child_stats),
+            load_count=sum(stats.load_count for stats in child_stats),
+            persistence_enabled=self.config.persistence_path is not None,
+        )
+
+    @property
+    def persistence_recovery_reason(self) -> Optional[str]:
+        reasons = [
+            f"namespace {namespace!r}: {partition.persistence_recovery_reason}"
+            for namespace, partition in self._partitions.items()
+            if partition.persistence_recovery_reason is not None
+        ]
+        return "; ".join(reasons) or None
+
+    @property
+    def rebuild_count(self) -> int:
+        return self.stats.rebuild_count
+
+    @property
+    def load_count(self) -> int:
+        return self.stats.load_count
+
+    @property
+    def _index(self):
+        return self._single_partition()._index
+
+    @_index.setter
+    def _index(self, value) -> None:
+        self._single_partition()._index = value
+
+    @property
+    def _key_by_record_id(self) -> dict[UUID, int]:
+        return {
+            record_id: key
+            for partition in self._partitions.values()
+            for record_id, key in partition._key_by_record_id.items()
+        }
+
+    def initialize(self, entries: Sequence[ExecutionRecord]) -> None:
+        """Load or rebuild each namespace partition from authoritative records."""
+
+        with self._lock:
+            self._partitions = {}
+            self._namespace_by_record_id = {}
+            groups = self._group_by_namespace(entries)
+            if not groups and self.config.persistence_path is not None:
+                groups[""] = []
+            for namespace, records in groups.items():
+                partition = self._new_partition(namespace)
+                partition.initialize(records)
+                self._partitions[namespace] = partition
+                for record in records:
+                    self._namespace_by_record_id[record.id] = namespace
+
+    def search(
+        self,
+        query_embedding: Sequence[float],
+        entries: Sequence[ExecutionRecord],
+        threshold: float,
+        top_k: Optional[int],
+    ) -> list[tuple[ExecutionRecord, float]]:
+        """Compatibility search across partitions with exact reranking."""
+
+        self.rebuild(entries)
+        candidate_ids = self.candidate_ids(query_embedding, top_k)
+        records_by_id = {record.id: record for record in entries}
+        return rerank_candidates(
+            query_embedding,
+            candidate_ids,
+            records_by_id,
+            threshold,
+            top_k,
+        )
+
+    def rebuild(self, entries: Sequence[ExecutionRecord]) -> None:
+        """Reconcile all partitions with authoritative storage."""
+
+        with self._lock:
+            groups = self._group_by_namespace(entries)
+            namespaces = set(groups) | set(self._partitions)
+            if not namespaces and self.config.persistence_path is not None:
+                namespaces.add("")
+            for namespace in namespaces:
+                partition = self._partitions.get(namespace)
+                if partition is None:
+                    partition = self._new_partition(namespace)
+                    self._partitions[namespace] = partition
+                partition.rebuild(groups.get(namespace, []))
+            self._namespace_by_record_id = {
+                record.id: namespace
+                for namespace, records in groups.items()
+                for record in records
+            }
+
+    def upsert(self, record: ExecutionRecord) -> str:
+        """Upsert a record, moving it atomically between namespace partitions."""
+
+        with self._lock:
+            namespace = record.context.namespace
+            previous_namespace = self._namespace_by_record_id.get(record.id)
+            if previous_namespace is not None and previous_namespace != namespace:
+                previous = self._partitions[previous_namespace]
+                previous.delete(record.id)
+                result = self._partition(namespace).upsert(record)
+                self._namespace_by_record_id[record.id] = namespace
+                return "updated"
+
+            result = self._partition(namespace).upsert(record)
+            self._namespace_by_record_id[record.id] = namespace
+            return result
+
+    def delete(self, record_id: UUID) -> bool:
+        """Delete a record from its namespace partition."""
+
+        with self._lock:
+            namespace = self._namespace_by_record_id.get(record_id)
+            if namespace is None:
+                return False
+            removed = self._partitions[namespace].delete(record_id)
+            if removed:
+                del self._namespace_by_record_id[record_id]
+            return removed
+
+    def clear(self) -> None:
+        """Clear all namespace partitions and their persistent state."""
+
+        with self._lock:
+            for partition in self._partitions.values():
+                partition.clear()
+            self._namespace_by_record_id = {}
+
+    def candidate_ids(
+        self,
+        query_embedding: Sequence[float],
+        top_k: Optional[int],
+        *,
+        namespace: Optional[str] = None,
+        predicate: Optional[Callable[[ExecutionRecord], bool]] = None,
+    ) -> list[UUID]:
+        """Search selected namespaces and exclude incompatible records safely."""
+
+        with self._lock:
+            if namespace is None:
+                partitions = list(self._partitions.values())
+            else:
+                partition = self._partitions.get(namespace)
+                partitions = [] if partition is None else [partition]
+
+            candidate_ids: list[UUID] = []
+            for partition in partitions:
+                eligible_ids = None
+                if predicate is not None:
+                    eligible_ids = {
+                        record.id for record in partition._records if predicate(record)
+                    }
+                candidate_ids.extend(
+                    partition.candidate_ids(
+                        query_embedding,
+                        top_k,
+                        eligible_ids=eligible_ids,
+                    )
+                )
+            return list(dict.fromkeys(candidate_ids))
+
+    def _partition(self, namespace: str) -> HnswSimilarityIndex:
+        partition = self._partitions.get(namespace)
+        if partition is None:
+            partition = self._new_partition(namespace)
+            self._partitions[namespace] = partition
+        return partition
+
+    def _new_partition(self, namespace: str) -> HnswSimilarityIndex:
+        persistence_path = self._partition_path(namespace)
+        config = replace(self.config, persistence_path=persistence_path)
+        return HnswSimilarityIndex(config)
+
+    def _partition_path(self, namespace: str) -> Optional[Path]:
+        if self.config.persistence_path is None:
+            return None
+        base = Path(self.config.persistence_path)
+        if namespace == "":
+            return base
+        digest = hashlib.sha256(namespace.encode("utf-8")).hexdigest()
+        return base.parent / f"{base.name}.partitions" / f"{digest}.usearch"
+
+    def _single_partition(self) -> HnswSimilarityIndex:
+        if len(self._partitions) != 1:
+            raise AnnIndexStateError(
+                "A single native index is unavailable for multiple namespaces."
+            )
+        return next(iter(self._partitions.values()))
+
+    @staticmethod
+    def _group_by_namespace(
+        entries: Sequence[ExecutionRecord],
+    ) -> dict[str, list[ExecutionRecord]]:
+        groups: dict[str, list[ExecutionRecord]] = {}
+        for record in entries:
+            groups.setdefault(record.context.namespace, []).append(record)
+        return groups

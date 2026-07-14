@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.1.0.dev5] - Unreleased
+## [1.1.0.dev6] - Unreleased
+
+### Added
+
+- Namespace-partitioned HNSW indexes for scalable default tenant/application
+  isolation.
+- Conservative adaptive candidate expansion for `kb_version`,
+  `prompt_version`, and `model` policy constraints.
+- Independent persistence and corruption recovery for each namespace partition.
+
+### Changed
+
+- ANN filtering now happens before storage candidate lookup and exact reranking,
+  preventing incompatible global neighbors from crowding out valid records.
+- Namespace-only context changes move stable record IDs between partitions
+  incrementally.
+
+### Not supported
+
+- Arbitrary `ExecutionContext.metadata` values remain descriptive only; they are
+  not implicit filters because `ReusePolicy` defines no matching semantics for
+  them.
+
+---
+
+## [1.1.0.dev5] - 2026-07-14
 
 ### Added
 

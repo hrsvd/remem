@@ -137,7 +137,17 @@ class ReuseEngine:
                     query_embedding, compatible, threshold=threshold
                 )
 
-            candidate_ids = self.similarity.find_candidate_ids(query_embedding, top_k=1)
+            namespace = (
+                context.namespace if self.policy.require_same_namespace else None
+            )
+            candidate_ids = self.similarity.find_candidate_ids(
+                query_embedding,
+                top_k=1,
+                namespace=namespace,
+                predicate=lambda record: self.policy.is_compatible(
+                    context, record.context
+                ),
+            )
             records = self.storage.get_many(candidate_ids)
             resolved_ids = {record.id for record in records}
             missing_ids = [

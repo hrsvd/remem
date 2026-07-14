@@ -42,7 +42,8 @@ This roadmap outlines the long-term vision for Remem. The project is developed i
 - Record-ID lookup without query-time full storage scans (`1.1.0.dev3`, completed)
 - Incremental ANN mutation with consistency recovery (`1.1.0.dev4`, completed)
 - Persistent ANN indexes with validated fast reload (`1.1.0.dev5`, completed)
-- Namespace-aware filtering; arbitrary metadata indexing requires further design
+- Namespace-aware and structured-policy filtering (`1.1.0.dev6`, completed);
+  arbitrary metadata indexing requires explicit policy semantics and further design
 - Faster retrieval and memory optimizations
 
 *Storage*
