@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
-  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0.dev5-orange">
+  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0.dev6-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
   <img alt="PyPI" src="https://img.shields.io/badge/PyPI-remem--ai-blue">
 </p>
@@ -147,7 +147,9 @@ HNSW retrieves candidate record IDs, storage resolves only those records through
 
 Client-mediated inserts, embedding replacements, and deletions update HNSW incrementally using stable internal keys. Non-vector updates do not touch the native graph. Storage is written first; if ANN mutation fails, Remem rolls back storage and rebuilds the derived index or raises an explicit recovery error.
 
-`persistence_path` is optional and exact search ignores it. When configured, Remem atomically saves the native index plus checksummed, versioned JSON metadata after every graph mutation. Startup validates the format, HNSW configuration, vector dimension, storage identity, stable-key mapping, native size, and checksum before loading. Invalid or interrupted artifacts are derived caches: Remem rebuilds them from authoritative storage and exposes the reason through `client.ann_persistence_recovery_reason`. `client.ann_index_stats` reports record, load, and rebuild counts; a clean restart has `load_count == 1` and `rebuild_count == 0`.
+`persistence_path` is optional and exact search ignores it. When configured, Remem atomically saves each native namespace index plus checksummed, versioned JSON metadata after graph mutations. Startup validates the format, HNSW configuration, vector dimension, storage identity, stable-key mapping, native size, and checksum before loading. Invalid or interrupted artifacts are derived caches: Remem rebuilds only affected namespaces from authoritative storage and exposes the reason through `client.ann_persistence_recovery_reason`. `client.ann_index_stats` reports aggregate record, load, and rebuild counts; a clean restart has one load per non-empty namespace partition and zero rebuilds.
+
+HNSW is partitioned by `ExecutionContext.namespace`. With the default strict policy, queries search only the matching namespace. Within it, Remem applies `kb_version`, `prompt_version`, and `model` eligibility before storage lookup and expands ANN discovery geometrically until it has enough eligible candidates or exhausts the partition. This avoids false misses caused by a fixed global overfetch multiplier while keeping final scoring exact. If `require_same_namespace=False`, all namespace partitions are searched and their eligible candidates are exact-reranked together. Arbitrary `ExecutionContext.metadata` is not an implicit filter; only fields explicitly represented by `ReusePolicy` affect eligibility.
 
 ## Documentation
 

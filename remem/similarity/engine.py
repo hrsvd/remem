@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional
 from uuid import UUID
 
 from remem.models.execution_record import ExecutionRecord
@@ -8,7 +8,7 @@ from remem.similarity.index import (
     AnnConfig,
     AnnIndexStats,
     ExactSimilarityIndex,
-    HnswSimilarityIndex,
+    PartitionedHnswSimilarityIndex,
     rerank_candidates,
 )
 
@@ -32,7 +32,7 @@ class SimilarityEngine:
         if backend == "exact":
             self._index = ExactSimilarityIndex()
         elif backend == "hnsw":
-            self._index = HnswSimilarityIndex(ann_config)
+            self._index = PartitionedHnswSimilarityIndex(ann_config)
         else:
             raise ValueError("backend must be either 'exact' or 'hnsw'.")
         self.backend = backend
@@ -89,12 +89,20 @@ class SimilarityEngine:
         self,
         query_embedding: Sequence[float],
         top_k: Optional[int] = None,
+        *,
+        namespace: Optional[str] = None,
+        predicate: Optional[Callable[[ExecutionRecord], bool]] = None,
     ) -> list[UUID]:
         """Discover ANN candidate IDs without resolving storage records."""
 
         if self.backend != "hnsw":
             raise RuntimeError("Candidate ID discovery is available only for HNSW.")
-        return self._index.candidate_ids(query_embedding, top_k)
+        return self._index.candidate_ids(
+            query_embedding,
+            top_k,
+            namespace=namespace,
+            predicate=predicate,
+        )
 
     @staticmethod
     def rerank_candidate_records(
