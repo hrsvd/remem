@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
-  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0.dev4-orange">
+  <img alt="Version" src="https://img.shields.io/badge/Version-v1.1.0.dev5-orange">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
   <img alt="PyPI" src="https://img.shields.io/badge/PyPI-remem--ai-blue">
 </p>
@@ -133,7 +133,11 @@ client = Client()  # auto
 exact_client = Client(search_mode="exact_cosine")
 hnsw_client = Client(
     search_mode="hnsw_cosine",
-    ann_config=AnnConfig(ef_search=100, candidate_count=50),
+    ann_config=AnnConfig(
+        ef_search=100,
+        candidate_count=50,
+        persistence_path=".remem/records.usearch",
+    ),
 )
 ```
 
@@ -141,7 +145,9 @@ Inspect `client.resolved_search_mode` and `client.search_fallback_reason` to see
 
 HNSW retrieves candidate record IDs, storage resolves only those records through ordered batch lookup, and Remem then recalculates exact cosine similarity before sorting and applying reuse thresholds. Built-in ANN query retrieval therefore does not call `storage.all()`. Final scores retain exact cosine semantics (`-1.0` to `1.0`), although ANN candidate discovery does not guarantee exact nearest-neighbor recall. Increasing `candidate_count` can improve recall at the cost of reranking latency; higher `ef_search` can improve HNSW discovery recall at the cost of search latency.
 
-Client-mediated inserts, embedding replacements, and deletions update HNSW incrementally using stable internal keys. Non-vector updates do not touch the native graph. Storage is written first; if ANN mutation fails, Remem rolls back storage and rebuilds the derived index or raises an explicit recovery error. A full rebuild still occurs at startup and explicit storage reload. Index persistence remains planned.
+Client-mediated inserts, embedding replacements, and deletions update HNSW incrementally using stable internal keys. Non-vector updates do not touch the native graph. Storage is written first; if ANN mutation fails, Remem rolls back storage and rebuilds the derived index or raises an explicit recovery error.
+
+`persistence_path` is optional and exact search ignores it. When configured, Remem atomically saves the native index plus checksummed, versioned JSON metadata after every graph mutation. Startup validates the format, HNSW configuration, vector dimension, storage identity, stable-key mapping, native size, and checksum before loading. Invalid or interrupted artifacts are derived caches: Remem rebuilds them from authoritative storage and exposes the reason through `client.ann_persistence_recovery_reason`. `client.ann_index_stats` reports record, load, and rebuild counts; a clean restart has `load_count == 1` and `rebuild_count == 0`.
 
 ## Documentation
 

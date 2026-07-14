@@ -6,6 +6,7 @@ from uuid import UUID
 from remem.models.execution_record import ExecutionRecord
 from remem.similarity.index import (
     AnnConfig,
+    AnnIndexStats,
     ExactSimilarityIndex,
     HnswSimilarityIndex,
     rerank_candidates,
@@ -41,6 +42,28 @@ class SimilarityEngine:
 
         if self.backend == "hnsw":
             self._index.rebuild(entries)
+
+    def initialize(self, entries: Sequence[ExecutionRecord]) -> None:
+        """Load or derive initial ANN state; exact search has no state."""
+
+        if self.backend == "hnsw":
+            self._index.initialize(entries)
+
+    @property
+    def persistence_recovery_reason(self) -> Optional[str]:
+        """Explain why persistent ANN state was rebuilt, when applicable."""
+
+        if self.backend != "hnsw":
+            return None
+        return self._index.persistence_recovery_reason
+
+    @property
+    def ann_index_stats(self) -> Optional[AnnIndexStats]:
+        """Return ANN lifecycle counters, or ``None`` for exact search."""
+
+        if self.backend != "hnsw":
+            return None
+        return self._index.stats
 
     def upsert(self, record: ExecutionRecord) -> str:
         """Incrementally insert or replace one ANN record."""

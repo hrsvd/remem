@@ -30,7 +30,14 @@ class ReuseEngine:
         self.policy = policy
         self.metrics = metrics
         self._lifecycle_lock = RLock()
-        self.rebuild_index()
+        self.initialize_index()
+
+    def initialize_index(self) -> None:
+        """Load valid persistent ANN state or derive it from storage."""
+
+        with self._lifecycle_lock:
+            if self.similarity.backend == "hnsw":
+                self.similarity.initialize(self.storage.all())
 
     def rebuild_index(self) -> None:
         """Rebuild ANN state outside the query path from authoritative storage."""

@@ -59,13 +59,20 @@ client = Client(
         ef_construction=200,
         ef_search=100,
         candidate_count=50,
+        persistence_path=".remem/records.usearch",
     ),
 )
 ```
 
-`m` and `ef_construction` tune index construction. `ef_search` increases candidate-discovery recall when raised, at the cost of query time. `candidate_count` controls how many likely neighbors HNSW returns for exact cosine reranking; its default is 50. Larger candidate sets can improve recall but increase exact-reranking latency. Final ordering, score values, and threshold filtering use exact cosine. Candidate discovery remains approximate and does not guarantee the same neighbors as exhaustive search. The index is in-memory and is initially derived from the configured storage backend.
+`m` and `ef_construction` tune index construction. `ef_search` increases candidate-discovery recall when raised, at the cost of query time. `candidate_count` controls how many likely neighbors HNSW returns for exact cosine reranking; its default is 50. Larger candidate sets can improve recall but increase exact-reranking latency. Final ordering, score values, and threshold filtering use exact cosine. Candidate discovery remains approximate and does not guarantee the same neighbors as exhaustive search.
 
-Client-mediated record mutations synchronize HNSW incrementally. Inserts allocate stable internal keys; embedding replacements remove and reinsert the native vector under the same key; deletes compact native graph state; and response, reference, or context-only changes avoid graph mutation. Storage commits first. An ANN failure rolls storage back and rebuilds the derived graph, raising `AnnMutationError` so callers can observe the failed operation. Full rebuilds remain for startup, explicit reload, and recovery. Operations through one `Client` are lifecycle-locked; direct storage mutation and multi-process writers are outside the supported consistency boundary.
+`persistence_path` is an optional filesystem path for the native USearch index. Its default is `None`, preserving the in-memory behavior. Exact search ignores this option. With persistence enabled, Remem writes `<path>` and `<path>.meta.json`; the latter contains only index metadata, UUID/key mappings, and hashes, not responses or arbitrary context payloads. Parent directories are created automatically.
+
+On startup, Remem fast-loads only when the metadata format, engine identity, HNSW configuration, dimension, record/vector fingerprint, UUID/key mapping, native size, and SHA-256 checksum all match authoritative storage. Otherwise it rebuilds and atomically replaces the derived cache. Native data is written to a temporary file and committed before its metadata commit marker, so interruption at either boundary is detected on restart. Temporary files are ignored during reads.
+
+`client.ann_index_stats` is an `AnnIndexStats` value for HNSW and `None` for exact search. It exposes `record_count`, `rebuild_count`, `load_count`, and `persistence_enabled`. A successful persistent restart reports one load and zero rebuilds. `client.ann_persistence_recovery_reason` is `None` after a valid load and contains the validation failure that caused an automatic rebuild otherwise.
+
+Client-mediated record mutations synchronize HNSW incrementally. Inserts allocate stable internal keys; embedding replacements remove and reinsert the native vector under the same key; deletes compact native graph state; and response, reference, or context-only changes avoid graph mutation. Storage commits first. An ANN or persistence failure rolls storage back and rebuilds the derived graph, raising `AnnMutationError` so callers can observe the failed operation. Full rebuilds remain for unpersisted startup, explicit reload, validation failure, and recovery. Operations through one `Client` are lifecycle-locked; direct storage mutation and multi-process writers are outside the supported consistency boundary.
 
 ### `check(query_embedding, context)`
 

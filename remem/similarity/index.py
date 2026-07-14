@@ -7,8 +7,12 @@ rebuilt safely after a process restart.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from threading import RLock
 from typing import Mapping, Optional
 from uuid import UUID
@@ -31,6 +35,7 @@ class AnnConfig:
     ef_construction: int = 200
     ef_search: int = 50
     candidate_count: int = 50
+    persistence_path: Optional[str | Path] = None
 
     def __post_init__(self) -> None:
         if self.m <= 0:
@@ -41,6 +46,18 @@ class AnnConfig:
             raise ValueError("ef_search must be a positive integer.")
         if self.candidate_count <= 0:
             raise ValueError("candidate_count must be a positive integer.")
+        if self.persistence_path is not None and not str(self.persistence_path).strip():
+            raise ValueError("persistence_path must not be empty when provided.")
+
+
+@dataclass(frozen=True)
+class AnnIndexStats:
+    """Read-only lifecycle telemetry for the derived ANN index."""
+
+    record_count: int
+    rebuild_count: int
+    load_count: int
+    persistence_enabled: bool
 
 
 class AnnIndexStateError(RuntimeError):
@@ -49,6 +66,10 @@ class AnnIndexStateError(RuntimeError):
 
 class AnnMutationError(AnnIndexStateError):
     """Raised when storage and ANN mutation cannot complete atomically."""
+
+
+class AnnPersistenceError(AnnIndexStateError):
+    """Raised when persistent ANN state cannot be saved or validated."""
 
 
 def rerank_candidates(
@@ -105,9 +126,8 @@ class ExactSimilarityIndex:
 class HnswSimilarityIndex:
     """Optional USearch/HNSW cosine index synchronized from storage records.
 
-    The index is intentionally rebuildable rather than persisted separately:
-    JSON storage remains authoritative, avoiding stale index files and keeping
-    index updates and deletes correct across existing storage backends.
+    Persistent native state is an optional derived cache. Storage remains
+    authoritative, and stale or corrupt artifacts are rebuilt automatically.
     """
 
     def __init__(self, config: Optional[AnnConfig] = None) -> None:
@@ -131,6 +151,44 @@ class HnswSimilarityIndex:
         self._dimension: Optional[int] = None
         self._lock = RLock()
         self.rebuild_count = 0
+        self.load_count = 0
+        self.persistence_recovery_reason: Optional[str] = None
+
+    @property
+    def persistence_path(self) -> Optional[Path]:
+        if self.config.persistence_path is None:
+            return None
+        return Path(self.config.persistence_path)
+
+    @property
+    def metadata_path(self) -> Optional[Path]:
+        if self.persistence_path is None:
+            return None
+        return Path(f"{self.persistence_path}.meta.json")
+
+    @property
+    def stats(self) -> AnnIndexStats:
+        return AnnIndexStats(
+            record_count=len(self._records),
+            rebuild_count=self.rebuild_count,
+            load_count=self.load_count,
+            persistence_enabled=self.persistence_path is not None,
+        )
+
+    def initialize(self, entries: Sequence[ExecutionRecord]) -> None:
+        """Fast-load valid persistent state or rebuild it from storage."""
+
+        with self._lock:
+            if self.persistence_path is None:
+                self._synchronize(entries)
+                return
+            try:
+                self._load_persistent(entries)
+                self.persistence_recovery_reason = None
+            except Exception as exc:
+                self.persistence_recovery_reason = f"{type(exc).__name__}: {exc}"
+                self._synchronize(entries, force=True)
+                self._persist()
 
     def search(
         self,
@@ -159,7 +217,8 @@ class HnswSimilarityIndex:
         """Synchronize the derived index from authoritative records."""
 
         with self._lock:
-            self._synchronize(entries)
+            if self._synchronize(entries):
+                self._persist()
 
     def upsert(self, record: ExecutionRecord) -> str:
         """Insert or replace one record without rebuilding the full graph."""
@@ -182,6 +241,7 @@ class HnswSimilarityIndex:
                 self._embedding_by_record_id[record.id] = embedding
                 self._replace_cached_record(record)
                 self._refresh_fingerprint()
+                self._persist()
                 return "updated"
 
             if self._index is None:
@@ -195,6 +255,7 @@ class HnswSimilarityIndex:
             self._embedding_by_record_id[record.id] = embedding
             self._records.append(record)
             self._refresh_fingerprint()
+            self._persist()
             return "inserted"
 
     def delete(self, record_id: UUID) -> bool:
@@ -217,23 +278,16 @@ class HnswSimilarityIndex:
             ]
             self._refresh_fingerprint()
             if not self._records:
-                self.clear()
+                self._clear_state()
+            self._persist()
             return True
 
     def clear(self) -> None:
         """Reset native index data, mappings, and consistency state."""
 
         with self._lock:
-            if self._index is not None:
-                self._index.reset()
-            self._index = None
-            self._records = []
-            self._key_by_record_id = {}
-            self._record_id_by_key = {}
-            self._embedding_by_record_id = {}
-            self._next_key = 0
-            self._fingerprint = ()
-            self._dimension = None
+            self._clear_state()
+            self._persist()
 
     def candidate_ids(
         self,
@@ -273,17 +327,19 @@ class HnswSimilarityIndex:
 
             return list(dict.fromkeys(candidate_ids))
 
-    def _synchronize(self, entries: Sequence[ExecutionRecord]) -> None:
+    def _synchronize(
+        self, entries: Sequence[ExecutionRecord], *, force: bool = False
+    ) -> bool:
         fingerprint = tuple(
             (str(entry.id), tuple(float(value) for value in entry.embedding))
             for entry in entries
         )
-        if fingerprint == self._fingerprint:
-            return
+        if not force and fingerprint == self._fingerprint:
+            return False
 
         if not entries:
-            self.clear()
-            return
+            self._clear_state()
+            return True
 
         vectors = [
             self._validate_vector(entry.embedding, f"embedding for {entry.id}")
@@ -316,6 +372,7 @@ class HnswSimilarityIndex:
         self._fingerprint = fingerprint
         self._dimension = dimension
         self.rebuild_count += 1
+        return True
 
     def _create_index(self, dimension: int):
         return self._index_type(
@@ -337,6 +394,200 @@ class HnswSimilarityIndex:
             (str(record.id), self._embedding_by_record_id[record.id])
             for record in self._records
         )
+
+    def _clear_state(self) -> None:
+        if self._index is not None:
+            self._index.reset()
+        self._index = None
+        self._records = []
+        self._key_by_record_id = {}
+        self._record_id_by_key = {}
+        self._embedding_by_record_id = {}
+        self._next_key = 0
+        self._fingerprint = ()
+        self._dimension = None
+
+    def _persist(self) -> None:
+        path = self.persistence_path
+        metadata_path = self.metadata_path
+        if path is None or metadata_path is None:
+            return
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        index_temp = Path(f"{path}.tmp")
+        metadata_temp = Path(f"{metadata_path}.tmp")
+        try:
+            index_checksum = None
+            if self._index is not None:
+                self._index.save(str(index_temp))
+                index_checksum = self._file_checksum(index_temp)
+
+            metadata = {
+                "format_version": 1,
+                "engine": "usearch-hnsw-cosine-f32",
+                "config": self._persistence_config(),
+                "dimension": self._dimension,
+                "next_key": self._next_key,
+                "native_size": len(self._records),
+                "storage_fingerprint": self._storage_fingerprint(self._records),
+                "index_sha256": index_checksum,
+                "records": [
+                    {"id": str(record.id), "key": self._key_by_record_id[record.id]}
+                    for record in self._records
+                ],
+            }
+            with metadata_temp.open("w", encoding="utf-8") as handle:
+                json.dump(metadata, handle, indent=2, sort_keys=True)
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            if self._index is None:
+                if path.exists():
+                    path.unlink()
+            else:
+                os.replace(index_temp, path)
+            os.replace(metadata_temp, metadata_path)
+        except Exception as exc:
+            for temporary_path in (index_temp, metadata_temp):
+                if temporary_path.exists():
+                    temporary_path.unlink()
+            raise AnnPersistenceError(
+                f"Failed to save persistent ANN index at '{path}': {exc}"
+            ) from exc
+
+    def _load_persistent(self, entries: Sequence[ExecutionRecord]) -> None:
+        path = self.persistence_path
+        metadata_path = self.metadata_path
+        if path is None or metadata_path is None:
+            raise AnnPersistenceError("ANN persistence is not configured.")
+        if not metadata_path.is_file():
+            raise AnnPersistenceError(f"Metadata file '{metadata_path}' is missing.")
+
+        try:
+            with metadata_path.open("r", encoding="utf-8") as handle:
+                metadata = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise AnnPersistenceError(
+                f"Metadata file '{metadata_path}' is unreadable: {exc}"
+            ) from exc
+
+        if metadata.get("format_version") != 1:
+            raise AnnPersistenceError("Unsupported ANN persistence format version.")
+        if metadata.get("engine") != "usearch-hnsw-cosine-f32":
+            raise AnnPersistenceError("Persistent ANN engine identity is incompatible.")
+        if metadata.get("config") != self._persistence_config():
+            raise AnnPersistenceError("Persistent ANN configuration is incompatible.")
+        if metadata.get("storage_fingerprint") != self._storage_fingerprint(entries):
+            raise AnnPersistenceError(
+                "Persistent ANN state is stale for current storage."
+            )
+
+        raw_records = metadata.get("records")
+        if not isinstance(raw_records, list) or len(raw_records) != len(entries):
+            raise AnnPersistenceError("Persistent ANN record mapping is invalid.")
+        try:
+            key_by_record_id = {
+                UUID(item["id"]): int(item["key"]) for item in raw_records
+            }
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AnnPersistenceError(
+                "Persistent ANN record mapping is invalid."
+            ) from exc
+        if len(key_by_record_id) != len(entries):
+            raise AnnPersistenceError("Persistent ANN record IDs are not unique.")
+        keys = list(key_by_record_id.values())
+        if any(key < 0 for key in keys) or len(set(keys)) != len(keys):
+            raise AnnPersistenceError("Persistent ANN keys are invalid or duplicated.")
+        if set(key_by_record_id) != {record.id for record in entries}:
+            raise AnnPersistenceError("Persistent ANN record IDs do not match storage.")
+
+        next_key = metadata.get("next_key")
+        if not isinstance(next_key, int) or next_key < 0:
+            raise AnnPersistenceError("Persistent ANN next-key state is invalid.")
+        if keys and next_key <= max(keys):
+            raise AnnPersistenceError(
+                "Persistent ANN next key would reuse an active key."
+            )
+
+        if not entries:
+            if metadata.get("dimension") is not None:
+                raise AnnPersistenceError("Empty persistent ANN state has a dimension.")
+            if metadata.get("native_size") != 0:
+                raise AnnPersistenceError(
+                    "Empty persistent ANN state has native entries."
+                )
+            if metadata.get("index_sha256") is not None:
+                raise AnnPersistenceError(
+                    "Empty persistent ANN state references an index."
+                )
+            self._clear_state()
+            self._next_key = next_key
+            self.load_count += 1
+            return
+
+        vectors = [
+            self._validate_vector(record.embedding, f"embedding for {record.id}")
+            for record in entries
+        ]
+        dimension = int(vectors[0].size)
+        if any(vector.size != dimension for vector in vectors):
+            raise AnnPersistenceError(
+                f"Storage embeddings do not share dimension {dimension}."
+            )
+        if metadata.get("dimension") != dimension:
+            raise AnnPersistenceError("Persistent ANN dimension is incompatible.")
+        if metadata.get("native_size") != len(entries):
+            raise AnnPersistenceError("Persistent ANN native size is invalid.")
+        if not path.is_file():
+            raise AnnPersistenceError(f"Native index file '{path}' is missing.")
+        if metadata.get("index_sha256") != self._file_checksum(path):
+            raise AnnPersistenceError("Persistent ANN index checksum does not match.")
+
+        index = self._create_index(dimension)
+        index.load(str(path))
+        if int(index.size) != len(entries):
+            raise AnnPersistenceError("Loaded ANN index size does not match storage.")
+
+        self._index = index
+        self._records = list(entries)
+        self._key_by_record_id = key_by_record_id
+        self._record_id_by_key = {
+            key: record_id for record_id, key in key_by_record_id.items()
+        }
+        self._embedding_by_record_id = {
+            record.id: tuple(float(value) for value in record.embedding)
+            for record in entries
+        }
+        self._next_key = next_key
+        self._refresh_fingerprint()
+        self._dimension = dimension
+        self.load_count += 1
+
+    def _persistence_config(self) -> dict[str, int]:
+        return {
+            "m": self.config.m,
+            "ef_construction": self.config.ef_construction,
+            "ef_search": self.config.ef_search,
+            "candidate_count": self.config.candidate_count,
+        }
+
+    @staticmethod
+    def _storage_fingerprint(entries: Sequence[ExecutionRecord]) -> str:
+        canonical = [
+            [str(record.id), [float(value) for value in record.embedding]]
+            for record in sorted(entries, key=lambda item: str(item.id))
+        ]
+        payload = json.dumps(canonical, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _file_checksum(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     @staticmethod
     def _validate_vector(vector: Sequence[float], name: str) -> np.ndarray:
