@@ -9,7 +9,7 @@ from remem.models.execution_result import ExecutionResult
 from remem.reuse.engine import ReuseEngine, ReuseOutcome
 from remem.reuse.policy import ReusePolicy
 from remem.similarity.engine import SimilarityEngine
-from remem.similarity.index import AnnConfig
+from remem.similarity.index import AnnConfig, AnnIndexStats
 from remem.similarity.mode import SearchMode, SearchModeResolution, resolve_search_mode
 from remem.storage.json_storage import JsonStorage
 from remem.storage.storage import StorageInterface
@@ -59,6 +59,18 @@ class Client:
         self.reuse_planner = ReuseEngine(
             self.storage, self.similarity, self.policy, self.metrics
         )
+
+    @property
+    def ann_persistence_recovery_reason(self) -> Optional[str]:
+        """Explain why a configured persistent ANN cache was rebuilt."""
+
+        return self.similarity.persistence_recovery_reason
+
+    @property
+    def ann_index_stats(self) -> Optional[AnnIndexStats]:
+        """Return read-only ANN load/rebuild lifecycle telemetry."""
+
+        return self.similarity.ann_index_stats
 
     def check(
         self,

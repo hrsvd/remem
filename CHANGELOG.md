@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.1.0.dev4] - Unreleased
+## [1.1.0.dev5] - Unreleased
+
+### Added
+
+- Opt-in native HNSW persistence through `AnnConfig.persistence_path`.
+- Versioned metadata, native-file checksums, storage fingerprints, and stable-key
+  mappings for validated fast reload.
+- Public ANN lifecycle telemetry through `client.ann_index_stats` and an
+  inspectable `client.ann_persistence_recovery_reason`.
+
+### Changed
+
+- Valid persistent indexes load without a full vector rebuild at startup.
+- Missing, stale, incompatible, corrupt, or interrupted artifacts rebuild
+  automatically from authoritative storage and are atomically replaced.
+
+---
+
+## [1.1.0.dev4] - 2026-07-14
 
 ### Added
 

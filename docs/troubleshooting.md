@@ -5,6 +5,11 @@
 **`CorruptedSnapshotException` on startup**
 The JSON store file is malformed. Delete `remem_store.json` (or your custom path) to start fresh. This should not happen under normal operation — `JsonStorage` uses atomic writes to prevent mid-save corruption.
 
+**Persistent ANN index rebuilds at startup**
+Inspect `client.ann_persistence_recovery_reason`. Remem rebuilds automatically when the configured metadata or native index is missing, stale relative to storage, corrupt, interrupted, or incompatible with the current HNSW configuration or embedding dimension. After recovery, `client.ann_index_stats.rebuild_count` is incremented and the cache is rewritten; the next clean restart should report `load_count == 1` and `rebuild_count == 0`.
+
+Do not share one `persistence_path` among concurrent processes. Use one path per process/storage owner, or disable ANN persistence. If the configured directory is not writable, mutations raise `AnnMutationError` after attempting storage rollback and deterministic index recovery.
+
 ## Unexpected Behavior
 
 **Unexpected `MISS` decisions**
