@@ -30,7 +30,19 @@ suite instead verifies the work avoided by each ANN optimization:
 These are operation-count and lifecycle invariants, not wall-clock benchmark
 results. Inspect `client.ann_index_stats` for index load/rebuild telemetry.
 
-## Planned Comparative Benchmarks
+## Real-world evaluation
+
+The post-1.1 benchmark work now includes measured Banking77, PAWS-Wiki, and
+SQuAD evidence. The [real-world report](../benchmarks/reports/report.md) covers
+quality, thresholds, scale through 8,000 records, persistence, failures, and
+simulated work savings.
+
+The evidence classifies Remem as **suitable for internal testing**. HNSW
+materially improves query overhead, but unsafe response reuse and threshold
+instability block a production-ready claim. Results are hardware-specific, not
+package-level performance guarantees.
+
+## Comparative benchmark coverage
 
 ### Similarity Search
 
@@ -71,9 +83,9 @@ Measures complete LLM workflows rather than individual components:
 - Retrieval reuse rate
 - Generation reuse rate
 
-## Benchmark Environment
+## Benchmark environment
 
-Future benchmark reports will document:
+Benchmark reports document:
 
 - Hardware specifications
 - Python version
@@ -84,13 +96,13 @@ Future benchmark reports will document:
 
 This ensures results are reproducible and comparable across releases.
 
-## Current Status
+## Current status
 
 The correctness and operation-count instrumentation above ships in `1.1.0`.
-The repository's post-release benchmark framework can now generate reproducible
-wall-clock and quality reports, but reviewed hardware-specific results are not
-part of the `1.1.0` package release. Until reviewed result files are available,
-no fixed latency, throughput, memory, or recall improvement is claimed.
+The repository's post-release benchmark work publishes small reviewed summary
+artifacts while raw data, observations, embeddings, and indexes stay out of
+Git. Results remain specific to the recorded hardware, model, datasets, and
+configuration; they are not part of the `1.1.0` package release.
 
 ## Reproducible Evaluation Framework
 

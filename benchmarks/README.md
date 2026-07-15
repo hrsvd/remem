@@ -5,6 +5,11 @@ retrieval quality, search performance, scalability, persistence, and estimated
 work savings. Benchmark code is not included in the `remem-ai` wheel and does
 not change Remem's runtime defaults.
 
+The completed 2026-07-15 evaluation is published in the
+[real-world benchmark report](reports/report.md), with compact
+[JSON](reports/summary.json), [CSV](reports/summary.csv), charts, and
+[failure examples](reports/failure-examples.json).
+
 The benchmark asks whether each query should receive full-response reuse,
 retrieval-only reuse, or a complete miss. A fast decision is not credited when
 the matched record belongs to the wrong ground-truth response or retrieval
@@ -90,6 +95,12 @@ split. For exact-versus-HNSW comparisons, keep the workload, embeddings,
 thresholds, warmups, and repeats identical while changing only `search_mode`
 and `ann` parameters. Use `search_mode: "auto"` to record resolution and the
 fallback reason.
+
+The checked-in `*-validation-*`, `*-test-selected-*`, and `paws-scale-*`
+configurations reproduce the reported threshold, held-out, ANN sensitivity,
+and scale experiments after the ignored datasets have been downloaded and
+preprocessed. Set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` after the
+pinned model snapshot is cached to prevent network drift.
 
 ## Outputs and metrics
 

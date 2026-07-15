@@ -1,0 +1,183 @@
+{
+  "examples": [
+    {
+      "actual_decision": "response_reuse",
+      "dataset": "banking77",
+      "ground_truth": "retrieval_reuse",
+      "kind": "unsafe_reuse",
+      "matched_record": "Why isn't my disposable virtual card working?",
+      "query": "Why doesn't my disposable virtual card work?",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 0.9936156030558537,
+      "tags": [
+        "customer-support",
+        "intent",
+        "virtual_card_not_working"
+      ],
+      "thresholds": {
+        "response": 0.99,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "actual_decision": "response_reuse",
+      "dataset": "paws",
+      "ground_truth": "miss",
+      "kind": "unsafe_reuse",
+      "matched_record": "This was a series of nested polar scales , so that measurements in azimuth and elevation could be performed directly in angular coordinates relative to the ecliptic .",
+      "query": "This was a series of nested polar scales , so that measurements in azimuth and elevation could be performed directly in angular coordinates relative to the ecliptic .",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 1.0,
+      "tags": [
+        "hard-negative",
+        "high-overlap"
+      ],
+      "thresholds": {
+        "response": 0.95,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "actual_decision": "response_reuse",
+      "dataset": "paws",
+      "ground_truth": "miss",
+      "kind": "unsafe_reuse",
+      "matched_record": "His father emigrated to Missouri in 1868 , but returned when his wife became ill and before the rest of the family could go to America .",
+      "query": "His father emigrated to America in 1868 , but returned when his wife became ill and before the rest of the family could go to Missouri .",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 0.9946431221505729,
+      "tags": [
+        "hard-negative",
+        "high-overlap"
+      ],
+      "thresholds": {
+        "response": 0.95,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "actual_decision": "miss",
+      "dataset": "squad",
+      "ground_truth": "retrieval_reuse",
+      "kind": "false_miss",
+      "matched_record": null,
+      "query": "Which NFL team represented the NFC at Super Bowl 50?",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 0.0,
+      "tags": [
+        "qa",
+        "shared-passage",
+        "different-answer"
+      ],
+      "thresholds": {
+        "response": 0.99,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "actual_decision": "miss",
+      "dataset": "squad",
+      "ground_truth": "retrieval_reuse",
+      "kind": "false_miss",
+      "matched_record": null,
+      "query": "Where did Super Bowl 50 take place?",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 0.0,
+      "tags": [
+        "qa",
+        "shared-passage",
+        "different-answer"
+      ],
+      "thresholds": {
+        "response": 0.99,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "actual_decision": "response_reuse",
+      "ann_actual_decision": "response_reuse",
+      "ann_matched_record": "He appeared as General Tao in the Amazon - Show `` The Man at the High Castle '' , and as Onoda in AMC `` Hell On Wheels '' .",
+      "ann_similarity_score": 0.9760329614112011,
+      "dataset": "paws",
+      "ground_truth": "miss",
+      "kind": "exact_ann_top1_disagreement",
+      "matched_record": "He appeared as General Tao in the Amazon - Show `` The Man at the High Castle '' , and as Onoda in AMC `` Hell On Wheels '' .",
+      "query": "He appeared as General Onoda in the Amazon - Show `` The Man in High Castle '' and as Tao on AMCs '' Hell On Wheels '' .",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 0.9760329614112011,
+      "tags": [
+        "hard-negative",
+        "high-overlap"
+      ],
+      "thresholds": {
+        "response": 0.95,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "actual_decision": "response_reuse",
+      "ann_actual_decision": "response_reuse",
+      "ann_matched_record": "Katrina M. of Sputinik Music was positive and said that the song is reverse , bright and cheerful .",
+      "ann_similarity_score": 0.980555535295551,
+      "dataset": "paws",
+      "ground_truth": "miss",
+      "kind": "exact_ann_top1_disagreement",
+      "matched_record": "Katrina M. of Sputinik Music was positive and said that the song is reverse , bright and cheerful .",
+      "query": "Katrina M. of Sputinik Music was bright and cheerful and said the song is reversed , positive .",
+      "safe": false,
+      "search_mode": "exact_cosine",
+      "similarity_score": 0.980555535295551,
+      "tags": [
+        "hard-negative",
+        "high-overlap"
+      ],
+      "thresholds": {
+        "response": 0.95,
+        "retrieval": 0.95
+      }
+    },
+    {
+      "correct_misses": 4,
+      "dataset": "banking77",
+      "dimensions": [
+        "kb_version",
+        "model",
+        "namespace",
+        "prompt_version"
+      ],
+      "kind": "compatibility_isolation_summary",
+      "probes": 4
+    },
+    {
+      "correct_misses": 4,
+      "dataset": "paws",
+      "dimensions": [
+        "kb_version",
+        "model",
+        "namespace",
+        "prompt_version"
+      ],
+      "kind": "compatibility_isolation_summary",
+      "probes": 4
+    },
+    {
+      "correct_misses": 4,
+      "dataset": "squad",
+      "dimensions": [
+        "kb_version",
+        "model",
+        "namespace",
+        "prompt_version"
+      ],
+      "kind": "compatibility_isolation_summary",
+      "probes": 4
+    }
+  ],
+  "schema_version": 1
+}
