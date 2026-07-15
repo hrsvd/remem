@@ -50,6 +50,13 @@ dev = [
 ann = [
     "usearch>=2.17",
 ]
+benchmark = [
+    "datasets>=2.20",
+    "matplotlib>=3.7",
+    "pandas>=2.0",
+    "psutil>=5.9",
+    "sentence-transformers>=3.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/hrsvd/remem"

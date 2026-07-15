@@ -30,7 +30,19 @@ suite instead verifies the work avoided by each ANN optimization:
 These are operation-count and lifecycle invariants, not wall-clock benchmark
 results. Inspect `client.ann_index_stats` for index load/rebuild telemetry.
 
-## Planned Comparative Benchmarks
+## Real-world evaluation
+
+The post-1.1 benchmark work now includes measured Banking77, PAWS-Wiki, and
+SQuAD evidence. The [real-world report](../benchmarks/reports/report.md) covers
+quality, thresholds, scale through 8,000 records, persistence, failures, and
+simulated work savings.
+
+The evidence classifies Remem as **suitable for internal testing**. HNSW
+materially improves query overhead, but unsafe response reuse and threshold
+instability block a production-ready claim. Results are hardware-specific, not
+package-level performance guarantees.
+
+## Comparative benchmark coverage
 
 ### Similarity Search
 
@@ -71,9 +83,9 @@ Measures complete LLM workflows rather than individual components:
 - Retrieval reuse rate
 - Generation reuse rate
 
-## Benchmark Environment
+## Benchmark environment
 
-Future benchmark reports will document:
+Benchmark reports document:
 
 - Hardware specifications
 - Python version
@@ -84,9 +96,19 @@ Future benchmark reports will document:
 
 This ensures results are reproducible and comparable across releases.
 
-## Current Status
+## Current status
 
 The correctness and operation-count instrumentation above ships in `1.1.0`.
-A reproducible wall-clock benchmark harness and published hardware-specific
-reports remain planned; see the [Roadmap](roadmap.md). Until then, no fixed
-latency, throughput, memory, or recall improvement is claimed.
+The repository's post-release benchmark work publishes small reviewed summary
+artifacts while raw data, observations, embeddings, and indexes stay out of
+Git. Results remain specific to the recorded hardware, model, datasets, and
+configuration; they are not part of the `1.1.0` package release.
+
+## Reproducible Evaluation Framework
+
+The repository now contains a separate [real-world evaluation harness](../benchmarks/README.md)
+covering labeled reuse quality, threshold sweeps, exact-key and no-reuse
+baselines, exact-versus-HNSW diagnostics, persistence, mutations, resource use,
+and configurable cost estimates. Generated datasets and results remain ignored
+until reviewed; the main documentation continues to avoid unsupported
+performance claims.

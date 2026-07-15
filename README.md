@@ -169,6 +169,15 @@ Upgrading from `1.0.0` requires no JSON storage migration. See the [v1.1 migrati
 | [Troubleshooting](docs/troubleshooting.md) | Fixes for common issues |
 | [Migrating to v1.1](docs/migration-1.1.md) | Upgrade, compatibility, persistence, and operational notes |
 
+## Real-world evaluation
+
+The repository includes a reproducible [benchmark framework](benchmarks/README.md)
+for labeled response/retrieval reuse quality, hard-negative safety, threshold
+sweeps, exact-key and no-reuse baselines, and exact-versus-HNSW performance.
+Downloaded datasets, embedding caches, and generated results are not committed.
+No benchmark number is promoted here until its dataset, model revision,
+configuration, hardware, and result file have been reviewed.
+
 ## Testing
 
 From a source checkout, install development dependencies and run the test suite:
