@@ -1,0 +1,22 @@
+{
+  "citation": "Casanueva et al., Efficient Intent Detection with Dual Sentence Encoders (2020)",
+  "files": [
+    {
+      "name": "train.csv",
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/master/banking_data/train.csv"
+    },
+    {
+      "name": "test.csv",
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/master/banking_data/test.csv"
+    },
+    {
+      "name": "categories.json",
+      "url": "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/master/banking_data/categories.json"
+    }
+  ],
+  "homepage": "https://github.com/PolyAI-LDN/task-specific-datasets/tree/master/banking_data",
+  "license": "CC BY 4.0",
+  "name": "banking77",
+  "purpose": "Fine-grained customer-support intent and hard-negative evaluation",
+  "version": "upstream master snapshot; checksums recorded at download"
+}

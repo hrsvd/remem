@@ -1,0 +1,22 @@
+{
+  "citation": "Zhang, Baldridge, and He, PAWS: Paraphrase Adversaries from Word Scrambling (NAACL 2019)",
+  "files": [
+    {
+      "name": "train.parquet",
+      "url": "https://huggingface.co/datasets/google-research-datasets/paws/resolve/161ece9501cf0a11f3e48bd356eaa82de46d6a09/labeled_final/train-00000-of-00001.parquet"
+    },
+    {
+      "name": "validation.parquet",
+      "url": "https://huggingface.co/datasets/google-research-datasets/paws/resolve/161ece9501cf0a11f3e48bd356eaa82de46d6a09/labeled_final/validation-00000-of-00001.parquet"
+    },
+    {
+      "name": "test.parquet",
+      "url": "https://huggingface.co/datasets/google-research-datasets/paws/resolve/161ece9501cf0a11f3e48bd356eaa82de46d6a09/labeled_final/test-00000-of-00001.parquet"
+    }
+  ],
+  "homepage": "https://github.com/google-research-datasets/paws",
+  "license": "Free use for any purpose; Google attribution requested",
+  "name": "paws_wiki",
+  "purpose": "Human-labeled paraphrase safety and high-overlap hard negatives",
+  "version": "labeled_final mirror revision 161ece9501cf0a11f3e48bd356eaa82de46d6a09"
+}

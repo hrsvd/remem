@@ -87,6 +87,8 @@ htmlcov/
 # ==========================
 
 benchmarks/results/
+benchmarks/data/raw/
+benchmarks/data/processed/
 
 # ==========================
 # Temporary Files

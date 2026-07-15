@@ -1,0 +1,18 @@
+{
+  "citation": "Rajpurkar et al., SQuAD: 100,000+ Questions for Machine Comprehension of Text (EMNLP 2016)",
+  "files": [
+    {
+      "name": "train-v1.1.json",
+      "url": "https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json"
+    },
+    {
+      "name": "dev-v1.1.json",
+      "url": "https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json"
+    }
+  ],
+  "homepage": "https://rajpurkar.github.io/SQuAD-explorer/",
+  "license": "CC BY-SA 4.0",
+  "name": "squad_v1",
+  "purpose": "Question-answer response groups and shared-passage retrieval groups",
+  "version": "1.1"
+}

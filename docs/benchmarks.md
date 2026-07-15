@@ -87,6 +87,16 @@ This ensures results are reproducible and comparable across releases.
 ## Current Status
 
 The correctness and operation-count instrumentation above ships in `1.1.0`.
-A reproducible wall-clock benchmark harness and published hardware-specific
-reports remain planned; see the [Roadmap](roadmap.md). Until then, no fixed
-latency, throughput, memory, or recall improvement is claimed.
+The repository's post-release benchmark framework can now generate reproducible
+wall-clock and quality reports, but reviewed hardware-specific results are not
+part of the `1.1.0` package release. Until reviewed result files are available,
+no fixed latency, throughput, memory, or recall improvement is claimed.
+
+## Reproducible Evaluation Framework
+
+The repository now contains a separate [real-world evaluation harness](../benchmarks/README.md)
+covering labeled reuse quality, threshold sweeps, exact-key and no-reuse
+baselines, exact-versus-HNSW diagnostics, persistence, mutations, resource use,
+and configurable cost estimates. Generated datasets and results remain ignored
+until reviewed; the main documentation continues to avoid unsupported
+performance claims.

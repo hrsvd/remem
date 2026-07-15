@@ -1,0 +1,74 @@
+{
+  "cases": [
+    {
+      "context": {},
+      "dataset": "tiny_fixture",
+      "expected": "response_reuse",
+      "id": "tiny-case-response",
+      "query": "How do I reset my password?",
+      "response_group": "password-reset-answer",
+      "retrieval_group": "password-docs",
+      "split": "test",
+      "tags": ["exact-duplicate"]
+    },
+    {
+      "context": {},
+      "dataset": "tiny_fixture",
+      "expected": "retrieval_reuse",
+      "id": "tiny-case-retrieval",
+      "query": "Please request a refund for my card payment",
+      "response_group": null,
+      "retrieval_group": "refund-docs",
+      "split": "test",
+      "tags": ["related"]
+    },
+    {
+      "context": {},
+      "dataset": "tiny_fixture",
+      "expected": "miss",
+      "id": "tiny-case-miss",
+      "query": "Where can I download monthly invoices?",
+      "response_group": null,
+      "retrieval_group": null,
+      "split": "test",
+      "tags": ["unrelated"]
+    },
+    {
+      "context": {"namespace": "other-tenant"},
+      "dataset": "tiny_fixture",
+      "expected": "miss",
+      "id": "tiny-case-isolation",
+      "query": "How do I reset my password?",
+      "response_group": null,
+      "retrieval_group": null,
+      "split": "test",
+      "tags": ["isolation", "namespace"]
+    }
+  ],
+  "dataset": "tiny_fixture",
+  "dataset_version": "1",
+  "license": "Repository test fixture",
+  "name": "tiny-smoke",
+  "notes": ["Synthetic fixture for framework validation only; never reported as real-world evidence."],
+  "seed": 20260714,
+  "seeds": [
+    {
+      "context": {},
+      "id": "30a7ad3e-6ee9-5d7f-b0b6-7577bd72bf44",
+      "references": ["password-docs"],
+      "response": "Use the password reset link.",
+      "response_group": "password-reset-answer",
+      "retrieval_group": "password-docs",
+      "text": "How do I reset my password?"
+    },
+    {
+      "context": {},
+      "id": "91a6107d-b934-5526-b6e4-e888ce4b5887",
+      "references": ["refund-docs"],
+      "response": "Contact support to request a refund.",
+      "response_group": "refund-seed-answer",
+      "retrieval_group": "refund-docs",
+      "text": "How can I request a refund for a card payment?"
+    }
+  ]
+}
