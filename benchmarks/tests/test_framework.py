@@ -10,7 +10,7 @@ from benchmarks.io import load_workload, read_json, write_json
 from benchmarks.metrics.quality import percentile, retrieval_ranking_metrics, summarize
 from benchmarks.model import DecisionObservation
 from benchmarks.report import generate_report
-from benchmarks.run import run_benchmark
+from benchmarks.run import _directory_size, run_benchmark
 
 ROOT = Path(__file__).parents[2]
 FIXTURE = ROOT / "benchmarks" / "fixtures" / "tiny-workload.json"
@@ -117,17 +117,35 @@ def test_json_serialization_is_atomic_and_round_trips(tmp_path: Path) -> None:
     assert not path.with_suffix(".json.tmp").exists()
 
 
+def test_directory_size_includes_partition_siblings(tmp_path: Path) -> None:
+    base = tmp_path / "index"
+    partitions = tmp_path / "index.partitions"
+    partitions.mkdir()
+    (partitions / "namespace.usearch").write_bytes(b"index")
+    (partitions / "namespace.usearch.meta.json").write_bytes(b"metadata")
+    assert _directory_size(base) == 13
+
+
 def test_small_end_to_end_run_and_report(tmp_path: Path) -> None:
     config = read_json(ROOT / "benchmarks" / "configs" / "smoke-exact.json")
     config["workload"] = str(FIXTURE)
     config["output_dir"] = str(tmp_path / "results")
     config["name"] = "test-smoke"
+    config["record_limit"] = 2
+    config["query_limit"] = 3
     config_path = tmp_path / "config.json"
     write_json(config_path, config)
     result_path = run_benchmark(config_path)
     result = read_json(result_path)
     assert result["schema_version"] == 1
-    assert result["workload"]["queries"] == 4
+    assert result["workload"]["seed_records"] == 2
+    assert result["workload"]["queries"] == 3
+    assert result["workload"]["available_queries"] == 4
+    assert {row["case_id"] for row in result["observations"]} == {
+        "tiny-case-response",
+        "tiny-case-retrieval",
+        "tiny-case-isolation",
+    }
     assert result["search"]["resolved_mode"] == "exact_cosine"
     assert len(result["threshold_sweep"]) > 1
     report_path = generate_report([result_path], tmp_path / "report.md")

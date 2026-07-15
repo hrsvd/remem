@@ -264,13 +264,21 @@ def _retrieval_diagnostics(
 
 
 def _directory_size(path: Path) -> int:
-    if not path.exists():
+    if path.is_file():
+        return path.stat().st_size
+    if path.is_dir():
+        return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+    if not path.parent.exists():
         return 0
-    return sum(
-        item.stat().st_size
-        for item in path.parent.rglob(f"{path.name}*")
-        if item.is_file()
-    )
+    total = 0
+    for item in path.parent.glob(f"{path.name}*"):
+        if item.is_file():
+            total += item.stat().st_size
+        elif item.is_dir():
+            total += sum(
+                child.stat().st_size for child in item.rglob("*") if child.is_file()
+            )
+    return total
 
 
 def _validate_vectors(
@@ -307,16 +315,26 @@ def _validate_vectors(
 def run_benchmark(config_path: str | Path) -> Path:
     config = read_json(config_path)
     workload = load_workload(config["workload"])
+    record_limit = int(config.get("record_limit", len(workload.seeds)))
+    query_limit = int(config.get("query_limit", len(workload.cases)))
+    selected_seeds = workload.seeds[:record_limit]
+    isolation_cases = [case for case in workload.cases if "isolation" in case.tags]
+    ordinary_cases = [case for case in workload.cases if "isolation" not in case.tags]
+    if query_limit < len(isolation_cases):
+        selected_cases = isolation_cases[:query_limit]
+    else:
+        selected_cases = ordinary_cases[: query_limit - len(isolation_cases)]
+        selected_cases.extend(isolation_cases)
     output_dir = Path(config.get("output_dir", "benchmarks/results"))
     output_dir.mkdir(parents=True, exist_ok=True)
     provider = provider_from_config(
         config.get("embedding", {}), output_dir / "embedding-cache"
     )
-    all_ids = [seed.id for seed in workload.seeds] + [
-        case.id for case in workload.cases
+    all_ids = [seed.id for seed in selected_seeds] + [
+        case.id for case in selected_cases
     ]
-    all_texts = [seed.text for seed in workload.seeds] + [
-        case.query for case in workload.cases
+    all_texts = [seed.text for seed in selected_seeds] + [
+        case.query for case in selected_cases
     ]
     embedding_started = time.perf_counter_ns()
     vectors = dict(zip(all_ids, provider.encode(all_texts)))
@@ -326,8 +344,8 @@ def run_benchmark(config_path: str | Path) -> Path:
     )
 
     storage = InMemoryStorage()
-    seed_lookup = {seed.id: seed for seed in workload.seeds}
-    for seed_record in workload.seeds:
+    seed_lookup = {seed.id: seed for seed in selected_seeds}
+    for seed_record in selected_seeds:
         storage.put(
             ExecutionRecord(
                 id=UUID(seed_record.id),
@@ -363,7 +381,7 @@ def run_benchmark(config_path: str | Path) -> Path:
     rss_after = memory_rss_bytes()
     observations = _observe(
         client,
-        workload.cases,
+        selected_cases,
         vectors,
         seed_lookup,
         warmup=int(config.get("warmup", 1)),
@@ -373,7 +391,7 @@ def run_benchmark(config_path: str | Path) -> Path:
     retrieval_diagnostics = _retrieval_diagnostics(
         client,
         storage,
-        workload.cases,
+        selected_cases,
         vectors,
         seed_lookup,
         int(config.get("retrieval_k", 10)),
@@ -386,12 +404,12 @@ def run_benchmark(config_path: str | Path) -> Path:
         ann_config=ann_config,
     )
     raw_observations = _observe(
-        probe, workload.cases, vectors, seed_lookup, warmup=0, repeats=1
+        probe, selected_cases, vectors, seed_lookup, warmup=0, repeats=1
     )
     sweep = config.get("sweep", {})
     threshold_sweep = _threshold_sweep(
         raw_observations,
-        {case.id: case for case in workload.cases},
+        {case.id: case for case in selected_cases},
         seed_lookup,
         [
             float(value)
@@ -421,15 +439,36 @@ def run_benchmark(config_path: str | Path) -> Path:
     delete_ns = time.perf_counter_ns() - mutation_started
 
     warm_start_seconds = None
+    warm_reload_validation = None
     if persistence_path and client.resolved_search_mode.value == "hnsw_cosine":
         reload_started = time.perf_counter_ns()
-        Client(
+        warm_client = Client(
             storage_backend=storage,
             policy=policy,
             search_mode="hnsw_cosine",
             ann_config=ann_config,
         )
         warm_start_seconds = (time.perf_counter_ns() - reload_started) / 1_000_000_000
+        warm_observations = _observe(
+            warm_client, selected_cases, vectors, seed_lookup, warmup=0, repeats=1
+        )
+        warm_reload_validation = {
+            "decision_agreement": statistics.fmean(
+                before.predicted == after.predicted
+                for before, after in zip(observations, warm_observations)
+            ),
+            "matched_record_agreement": statistics.fmean(
+                before.matched_record_id == after.matched_record_id
+                for before, after in zip(observations, warm_observations)
+            ),
+            "recovery_reason": warm_client.ann_persistence_recovery_reason,
+            "stats": (
+                asdict(warm_client.ann_index_stats)
+                if warm_client.ann_index_stats
+                else None
+            ),
+            "validated_queries": len(warm_observations),
+        }
 
     assumptions = CostAssumptions(**config.get("cost_assumptions", {}))
     result = {
@@ -442,8 +481,10 @@ def run_benchmark(config_path: str | Path) -> Path:
             "dataset_version": workload.dataset_version,
             "license": workload.license,
             "seed": workload.seed,
-            "seed_records": len(workload.seeds),
-            "queries": len(workload.cases),
+            "seed_records": len(selected_seeds),
+            "queries": len(selected_cases),
+            "available_seed_records": len(workload.seeds),
+            "available_queries": len(workload.cases),
             "notes": workload.notes,
         },
         "configuration": config,
@@ -469,6 +510,7 @@ def run_benchmark(config_path: str | Path) -> Path:
         "performance": {
             "cold_start_seconds": cold_start_seconds,
             "warm_reload_seconds": warm_start_seconds,
+            "warm_reload_validation": warm_reload_validation,
             "memory_rss_before_bytes": rss_before,
             "memory_rss_after_build_bytes": rss_after,
             "memory_rss_delta_bytes": (
@@ -485,8 +527,8 @@ def run_benchmark(config_path: str | Path) -> Path:
         },
         "cost_effectiveness": _cost_summary(summary, assumptions),
         "baselines": {
-            "no_reuse": summarize(no_reuse(workload.cases)),
-            "exact_key": summarize(exact_key(workload.seeds, workload.cases)),
+            "no_reuse": summarize(no_reuse(selected_cases)),
+            "exact_key": summarize(exact_key(selected_seeds, selected_cases)),
         },
         "observations": [asdict(row) for row in observations],
         "raw_nearest_observations": [asdict(row) for row in raw_observations],

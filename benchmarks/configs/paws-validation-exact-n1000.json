@@ -1,0 +1,16 @@
+{
+  "ann": {"candidate_count": 50, "ef_search": 50},
+  "cost_assumptions": {"input_tokens_per_call": 1000, "model_cost_per_call": 0.01, "output_tokens_per_call": 300, "retrieval_cost_per_call": 0.001},
+  "embedding": {"batch_size": 64, "model": "sentence-transformers/all-MiniLM-L6-v2", "provider": "sentence_transformers", "revision": "c9745ed1d9f207416be6d2e6f8de32d1f16199bf"},
+  "name": "paws-validation-exact-n1000",
+  "output_dir": "benchmarks/results",
+  "query_limit": 1004,
+  "record_limit": 1000,
+  "repeats": 3,
+  "retrieval_k": 10,
+  "search_mode": "exact_cosine",
+  "sweep": {"response": [0.8, 0.85, 0.9, 0.93, 0.95, 0.97, 0.99], "retrieval": [0.7, 0.75, 0.8, 0.85, 0.9, 0.95]},
+  "thresholds": {"response": 0.95, "retrieval": 0.8},
+  "warmup": 1,
+  "workload": "benchmarks/data/processed/paws_wiki-validation.json"
+}
