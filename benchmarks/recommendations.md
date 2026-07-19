@@ -14,6 +14,12 @@ does not start the next product roadmap.
   criteria. PAWS exact/HNSW tiers agreed 100% while top-1 agreed only 93.9%.
 - Require a minimum support count or confidence interval for threshold claims.
   Banking77 validation had 11 conservative hits; held-out precision was 92.31%.
+- Treat multi-signal heuristics as response-tier guardrails, not semantic proof.
+  On held-out PAWS, a `0.10` score margin improved response precision from
+  29.95% to 43.56%, but 56.44% of remaining response hits were still unsafe.
+- Require explicit dependency metadata (retrieval filters, authorization scope,
+  tool state, and source/version identity) before reusing retrieval artifacts.
+  Text checks cannot infer these application invariants reliably.
 
 ## P1 — production-readiness blockers
 
@@ -37,6 +43,8 @@ does not start the next product roadmap.
 
 - Document per-tier threshold calibration with minimum support counts. Safe
   settings in this suite often reduced recall below 1%.
+- Do not promote the benchmark's `0.10` response score margin to a global
+  default. It was selected on PAWS validation and had dataset-specific effects.
 - Provide a supported audit export for matched ID, tier, score, compatibility
   context, and mode resolution; these fields diagnosed the important failures.
 - Keep offline, revision-pinned commands so model network probes cannot drift

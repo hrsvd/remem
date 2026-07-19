@@ -32,8 +32,8 @@ results. Inspect `client.ann_index_stats` for index load/rebuild telemetry.
 
 ## Real-world evaluation
 
-The post-1.1 benchmark work now includes measured Banking77, PAWS-Wiki, and
-SQuAD evidence. The [real-world report](../benchmarks/reports/report.md) covers
+The post-1.1 benchmark work now includes measured Banking77, PAWS-Wiki, SQuAD,
+and BEIR SciFact evidence. The [real-world report](../benchmarks/reports/report.md) covers
 quality, thresholds, scale through 8,000 records, persistence, failures, and
 simulated work savings.
 
@@ -112,3 +112,11 @@ baselines, exact-versus-HNSW diagnostics, persistence, mutations, resource use,
 and configurable cost estimates. Generated datasets and results remain ignored
 until reviewed; the main documentation continues to avoid unsupported
 performance claims.
+
+A 2026-07-19 follow-up compares threshold-only decisions with dependency-light
+multi-signal policy checks on the same held-out workloads. The checks can
+downgrade a response hit to retrieval reuse when intent, entities, values,
+time, negation, direction, format, freshness, or score ambiguity differs. The
+results show improved response-tier precision on difficult workloads, but also
+show that lexical signals alone cannot prove response equivalence; applications
+still need labeled calibration and explicit dependency metadata.

@@ -125,6 +125,44 @@ print(outcome.result)   # cached or freshly computed — Remem decides
 
 New to Remem? Start with the [5-minute Quickstart](docs/QuickStart.md). For the complete method-by-method reference, see the [API Reference](docs/api.md).
 
+### Multi-signal reuse policy
+
+Provide the current query in context metadata to let Remem reject a cached
+response when high cosine similarity hides a meaning-changing difference:
+
+```python
+from remem import ExecutionContext, ReusePolicy
+
+policy = ReusePolicy(
+    retrieval_threshold=0.90,
+    response_threshold=0.98,
+    required_metadata_keys=("retrieval_filter_hash",),
+    max_response_age_seconds=15 * 60,
+    minimum_response_score_margin=0.10,
+)
+client = Client(policy=policy)
+
+context = ExecutionContext(
+    metadata={
+        "query": query,
+        "retrieval_filter_hash": active_filter_hash,
+    }
+)
+outcome = client.check(embed(query), context=context)
+print(outcome.decision, outcome.reason, outcome.diagnostics)
+```
+
+The dependency-light policy checks operation/intent, critical entities and
+values, time scope, negation, direction, and requested output format. Explicit
+metadata such as `operation`, `entities`, `temporal_scope`, and `output_format`
+overrides text heuristics. A failed response-only check downgrades a compatible
+match to retrieval reuse; failed required metadata or retrieval freshness
+returns a miss. Each check has an `enable_*_check` switch, and deployments that
+omit query metadata retain threshold-only behavior. These signals are
+conservative guardrails, not proof that two responses are interchangeable;
+calibrate them on application labels and place dependency state in
+`required_metadata_keys`.
+
 ### Optional ANN search
 
 `auto` is the default: it uses HNSW when the optional dependency is installed and otherwise falls back to exact cosine. You can also force either strategy:

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Dependency-light multi-signal response safeguards for intent, critical
+  entities and values, temporal scope, negation, direction, requested output
+  format, freshness, required metadata, and candidate-score ambiguity.
+- Structured reuse diagnostics with per-check results and tier-specific
+  rejection reasons, while preserving the existing public decision fields.
+- Paired similarity-only and multi-signal benchmarks for Banking77, PAWS-Wiki,
+  SQuAD, and BEIR SciFact, including a streamed SciFact preprocessor and pinned
+  dataset manifest.
+
+### Changed
+
+- A response-ineligible but retrieval-compatible match now falls back to
+  retrieval reuse instead of serving the cached response. Existing callers
+  without query metadata retain threshold-only behavior.
+- The benchmark runner now passes query text through `ExecutionContext` and
+  accepts optional policy configuration without changing search architecture.
+
+---
+
 ## [1.1.0] - 2026-07-14
 
 ### Added
