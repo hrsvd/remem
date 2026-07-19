@@ -22,6 +22,7 @@ group.
 | PAWS-Wiki | `labeled_final`, [Google Research](https://github.com/google-research-datasets/paws) | Free use for any purpose; attribution requested | Human-labeled paraphrases and high-overlap non-paraphrases for response safety |
 | Banking77 | Official train/test files, [PolyAI](https://github.com/PolyAI-LDN/task-specific-datasets/tree/master/banking_data) | CC BY 4.0 | Fine-grained customer-support intents for retrieval reuse and semantic collisions |
 | SQuAD | 1.1, [Stanford](https://rajpurkar.github.io/SQuAD-explorer/) | CC BY-SA 4.0 | Shared source passages for retrieval reuse and answer spans for response equivalence |
+| BEIR SciFact | BEIR archive, [UKP-TUDA](https://github.com/beir-cellar/beir) | CC BY-NC 2.0 | Scientific claims sharing cited evidence, with no assumed response equivalence |
 
 Download receipts record source URLs, byte sizes, and SHA-256 checksums. Raw and
 processed datasets are ignored by Git. PAWS-QQP is deliberately excluded
@@ -38,6 +39,9 @@ because its upstream project cannot redistribute the underlying Quora text.
 - SQuAD questions sharing a source passage may reuse retrieval. Full-response
   reuse additionally requires the normalized annotated answer text to match.
   Development passages are split by context hash, preventing passage leakage.
+- SciFact claims with a positive qrel to the same document may reuse retrieval;
+  distinct claims never receive response-equivalent labels. Official train is
+  validation and official test remains held out.
 - Exact duplicates and controlled namespace, KB-version, prompt-version, and
   model changes exercise response hits and isolation failures.
 
@@ -75,9 +79,11 @@ Download and preprocess validation data:
 python -m benchmarks.datasets.download banking77
 python -m benchmarks.datasets.download paws_wiki
 python -m benchmarks.datasets.download squad_v1
+python -m benchmarks.datasets.download beir_scifact
 python -m benchmarks.datasets.preprocess banking77 --split validation
 python -m benchmarks.datasets.preprocess paws_wiki --split validation
 python -m benchmarks.datasets.preprocess squad_v1 --split validation
+python -m benchmarks.datasets.preprocess beir_scifact --split validation
 ```
 
 Create held-out workloads by replacing `validation` with `test`. Use `--limit`
@@ -101,6 +107,12 @@ configurations reproduce the reported threshold, held-out, ANN sensitivity,
 and scale experiments after the ignored datasets have been downloaded and
 preprocessed. Set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` after the
 pinned model snapshot is cached to prevent network drift.
+
+The `*-similarity-only-*` and `*-multi-signal-*` configs are paired held-out
+comparisons. They keep data, embeddings, thresholds, and search mode fixed; the
+similarity-only profile disables the new policy checks, while the multi-signal
+profile applies the validation-selected `0.10` response score margin. This
+margin is an experiment setting, not a new runtime default.
 
 ## Outputs and metrics
 
