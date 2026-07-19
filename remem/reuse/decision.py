@@ -20,6 +20,7 @@ class ReuseOutcome:
         reason: str,
         matched_record_id: Optional[UUID] = None,
         references: Optional[list[str]] = None,
+        diagnostics: Optional[dict[str, Any]] = None,
     ):
         self.result = result
         self.decision = decision
@@ -27,3 +28,4 @@ class ReuseOutcome:
         self.reason = reason
         self.matched_record_id = matched_record_id
         self.references = references or []
+        self.diagnostics = diagnostics or {}

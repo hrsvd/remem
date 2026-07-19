@@ -120,32 +120,54 @@ class ReuseEngine:
                     "ANN clear failed; storage was restored and the index rebuilt."
                 ) from mutation_error
 
-    def _find_best_compatible(
+    def _find_compatible_matches(
         self,
         query_embedding: list[float],
         context: ExecutionContext,
         threshold: float,
-    ):
+    ) -> list[SimilarityMatch]:
         """Shared metadata-filter + similarity scan used by both public methods."""
+        match_count = (
+            2
+            if self.policy.enable_candidate_ambiguity_check
+            and self.policy.minimum_response_score_margin is not None
+            else 1
+        )
         with self._lifecycle_lock:
             if self.similarity.backend == "exact":
                 all_entries = self.storage.all()
                 compatible = MetadataMatcher.filter_candidates(
                     all_entries, context, self.policy
                 )
-                return self.similarity.find_best_match(
-                    query_embedding, compatible, threshold=threshold
-                )
+                compatible = [
+                    record
+                    for record in compatible
+                    if self.policy.retrieval_freshness_check(
+                        context, record.created_at
+                    )["passed"]
+                ]
+                return [
+                    SimilarityMatch(entry=entry, score=score)
+                    for entry, score in self.similarity.find_all_matches(
+                        query_embedding,
+                        compatible,
+                        threshold=threshold,
+                        top_k=match_count,
+                    )
+                ]
 
             namespace = (
                 context.namespace if self.policy.require_same_namespace else None
             )
             candidate_ids = self.similarity.find_candidate_ids(
                 query_embedding,
-                top_k=1,
+                top_k=match_count,
                 namespace=namespace,
-                predicate=lambda record: self.policy.is_compatible(
-                    context, record.context
+                predicate=lambda record: (
+                    self.policy.is_compatible(context, record.context)
+                    and self.policy.retrieval_freshness_check(
+                        context, record.created_at
+                    )["passed"]
                 ),
             )
             records = self.storage.get_many(candidate_ids)
@@ -174,12 +196,138 @@ class ReuseEngine:
                 ordered_ids,
                 compatible,
                 threshold,
-                top_k=1,
+                top_k=match_count,
             )
-            if not matches:
-                return None
-            entry, score = matches[0]
-            return SimilarityMatch(entry=entry, score=score)
+            return [
+                SimilarityMatch(entry=entry, score=score) for entry, score in matches
+            ]
+
+    def _evaluate_reuse(
+        self,
+        matches: list[SimilarityMatch],
+        context: ExecutionContext,
+    ) -> tuple[ReuseDecision, SimilarityMatch | None, str, dict]:
+        if not matches:
+            diagnostics = {
+                "similarity": {
+                    "score": 0.0,
+                    "retrieval_threshold": self.policy.retrieval_threshold,
+                    "response_threshold": self.policy.response_threshold,
+                    "retrieval_passed": False,
+                    "response_passed": False,
+                    "top_score_margin": None,
+                },
+                "checks": {},
+                "response_reuse": {
+                    "eligible": False,
+                    "rejection_reasons": [
+                        "no compatible candidate met retrieval threshold"
+                    ],
+                },
+                "retrieval_reuse": {
+                    "eligible": False,
+                    "rejection_reasons": [
+                        "no compatible candidate met retrieval threshold"
+                    ],
+                },
+            }
+            return (
+                ReuseDecision.MISS,
+                None,
+                "No compatible execution met the retrieval threshold.",
+                diagnostics,
+            )
+
+        best = matches[0]
+        margin = best.score - matches[1].score if len(matches) > 1 else None
+        compatibility_passed, compatibility_failures = self.policy.compatibility_check(
+            context, best.entry.context
+        )
+        checks = self.policy.response_checks(
+            context, best.entry.context, best.entry.created_at, margin
+        )
+        checks["metadata_compatibility"] = {
+            "passed": compatibility_passed,
+            "applied": True,
+            "detail": (
+                "namespace, version, model, and required metadata matched"
+                if compatibility_passed
+                else "; ".join(compatibility_failures)
+            ),
+        }
+        checks["cached_response"] = {
+            "passed": best.entry.response is not None,
+            "applied": True,
+            "detail": (
+                "cached response is available"
+                if best.entry.response is not None
+                else "cached response is unavailable"
+            ),
+        }
+        response_failures = [
+            f"{name}: {result['detail']}"
+            for name, result in checks.items()
+            if not result["passed"]
+        ]
+        response_similarity_passed = best.score >= self.policy.response_threshold
+        if not response_similarity_passed:
+            response_failures.insert(
+                0,
+                f"similarity {best.score:.4f} below response threshold {self.policy.response_threshold:.4f}",
+            )
+        response_eligible = response_similarity_passed and not response_failures
+        retrieval_freshness = self.policy.retrieval_freshness_check(
+            context, best.entry.created_at
+        )
+        retrieval_eligible = (
+            best.score >= self.policy.retrieval_threshold
+            and compatibility_passed
+            and retrieval_freshness["passed"]
+        )
+        retrieval_failures = []
+        if best.score < self.policy.retrieval_threshold:
+            retrieval_failures.append(
+                f"similarity {best.score:.4f} below retrieval threshold {self.policy.retrieval_threshold:.4f}"
+            )
+        if not compatibility_passed:
+            retrieval_failures.extend(compatibility_failures)
+        if not retrieval_freshness["passed"]:
+            retrieval_failures.append(retrieval_freshness["detail"])
+        diagnostics = {
+            "similarity": {
+                "score": best.score,
+                "retrieval_threshold": self.policy.retrieval_threshold,
+                "response_threshold": self.policy.response_threshold,
+                "retrieval_passed": best.score >= self.policy.retrieval_threshold,
+                "response_passed": response_similarity_passed,
+                "top_score_margin": margin,
+            },
+            "checks": checks,
+            "response_reuse": {
+                "eligible": response_eligible,
+                "rejection_reasons": response_failures,
+            },
+            "retrieval_reuse": {
+                "eligible": retrieval_eligible,
+                "rejection_reasons": retrieval_failures,
+                "freshness": retrieval_freshness,
+            },
+        }
+        if response_eligible:
+            reason = (
+                f"Response reuse selected: similarity {best.score:.4f} passed "
+                "and all configured response checks passed."
+            )
+            return ReuseDecision.RESPONSE_REUSED, best, reason, diagnostics
+        if retrieval_eligible:
+            rejected = "; ".join(response_failures)
+            reason = (
+                f"Retrieval reuse selected: similarity {best.score:.4f} passed "
+                f"the retrieval threshold; response reuse rejected because {rejected}."
+            )
+            return ReuseDecision.RETRIEVAL_REUSED, best, reason, diagnostics
+        reason = "Miss selected: " + "; ".join(retrieval_failures)
+        return ReuseDecision.MISS, best, reason, diagnostics
 
     def check(
         self,
@@ -199,44 +347,59 @@ class ReuseEngine:
           ``remember()`` to store the result.
         """
         self.metrics.record(MetricEvent.REQUEST)
-        best_match = self._find_best_compatible(
+        matches = self._find_compatible_matches(
             query_embedding, context, self.policy.retrieval_threshold
         )
-
-        if not best_match:
+        decision, best_match, reason, diagnostics = self._evaluate_reuse(
+            matches, context
+        )
+        if best_match is None:
             self.metrics.record(MetricEvent.MISS)
             return ReuseOutcome(
                 result=None,
-                decision=ReuseDecision.MISS,
+                decision=decision,
                 similarity_score=0.0,
-                reason="No compatible execution found.",
+                reason=reason,
+                diagnostics=diagnostics,
             )
 
         matched = best_match.entry
-        self.storage.increment_hit(matched.id)
         score = best_match.score
+        if decision is ReuseDecision.MISS:
+            self.metrics.record(MetricEvent.MISS)
+            return ReuseOutcome(
+                result=None,
+                decision=decision,
+                similarity_score=score,
+                reason=reason,
+                matched_record_id=matched.id,
+                diagnostics=diagnostics,
+            )
 
-        if score >= self.policy.response_threshold and matched.response is not None:
+        self.storage.increment_hit(matched.id)
+        if decision is ReuseDecision.RESPONSE_REUSED:
             self.metrics.record(MetricEvent.HIT, similarity=score)
             self.metrics.record(MetricEvent.RESPONSE_REUSED)
             return ReuseOutcome(
                 result=matched.response,
-                decision=ReuseDecision.RESPONSE_REUSED,
+                decision=decision,
                 similarity_score=score,
-                reason=f"Vector similarity {score:.2f} met response threshold.",
+                reason=reason,
                 matched_record_id=matched.id,
                 references=matched.references,
+                diagnostics=diagnostics,
             )
 
         self.metrics.record(MetricEvent.HIT, similarity=score)
         self.metrics.record(MetricEvent.RETRIEVAL_REUSED)
         return ReuseOutcome(
             result=None,
-            decision=ReuseDecision.RETRIEVAL_REUSED,
+            decision=decision,
             similarity_score=score,
-            reason=f"Vector similarity {score:.2f} met retrieval threshold but fell below response threshold.",
+            reason=reason,
             matched_record_id=matched.id,
             references=matched.references,
+            diagnostics=diagnostics,
         )
 
     def get_or_compute(
@@ -254,12 +417,14 @@ class ReuseEngine:
         want explicit control over each pipeline stage.
         """
         self.metrics.record(MetricEvent.REQUEST)
-        best_match = self._find_best_compatible(
+        matches = self._find_compatible_matches(
             query_embedding, context, self.policy.retrieval_threshold
         )
+        decision, best_match, reason, diagnostics = self._evaluate_reuse(
+            matches, context
+        )
 
-        # MISS: run full pipeline and store the result
-        if not best_match:
+        if best_match is None or decision is ReuseDecision.MISS:
             self.metrics.record(MetricEvent.MISS)
             exec_result = compute_callback()
             self.store_record(
@@ -274,29 +439,28 @@ class ReuseEngine:
             return ReuseOutcome(
                 result=exec_result.response,
                 decision=ReuseDecision.MISS,
-                similarity_score=0.0,
-                reason="No compatible execution found.",
+                similarity_score=best_match.score if best_match else 0.0,
+                reason=reason,
+                matched_record_id=best_match.entry.id if best_match else None,
                 references=exec_result.references,
+                diagnostics=diagnostics,
             )
 
         matched_entry = best_match.entry
         self.storage.increment_hit(matched_entry.id)
         score = best_match.score
 
-        # Full hit: return cached LLM response, skip pipeline entirely
-        if (
-            score >= self.policy.response_threshold
-            and matched_entry.response is not None
-        ):
+        if decision is ReuseDecision.RESPONSE_REUSED:
             self.metrics.record(MetricEvent.HIT, similarity=score)
             self.metrics.record(MetricEvent.RESPONSE_REUSED)
             return ReuseOutcome(
                 result=matched_entry.response,
-                decision=ReuseDecision.RESPONSE_REUSED,
+                decision=decision,
                 similarity_score=score,
-                reason=f"Vector similarity {score:.2f} met response threshold.",
+                reason=reason,
                 matched_record_id=matched_entry.id,
                 references=matched_entry.references,
+                diagnostics=diagnostics,
             )
 
         # Partial hit: retrieval can be reused, re-run computation, store new result
@@ -314,9 +478,10 @@ class ReuseEngine:
         )
         return ReuseOutcome(
             result=computed_exec.response,
-            decision=ReuseDecision.RETRIEVAL_REUSED,
+            decision=decision,
             similarity_score=score,
-            reason=f"Vector similarity {score:.2f} met retrieval threshold but fell below response threshold.",
+            reason=reason,
             matched_record_id=matched_entry.id,
             references=matched_entry.references,
+            diagnostics=diagnostics,
         )
