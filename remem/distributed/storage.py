@@ -114,16 +114,22 @@ class DistributedStorage(StorageInterface):
 
     def put(self, record: ExecutionRecord) -> None:
         with self._lock:
+            remote_succeeded = False
             try:
                 self.remote.put(record)
+                remote_succeeded = True
                 self.metrics.record(MetricEvent.DISTRIBUTED_SYNC)
                 self.last_backend_error = None
             except Exception as exc:
                 self._pending.append(("put", record))
                 self.metrics.record(MetricEvent.DISTRIBUTED_SYNC_FAILURE)
                 self._failure(exc)
-            self.local.put(record)
-            self._sources[record.id] = "local"
+            if self.config.local_cache or not remote_succeeded:
+                self.local.put(record)
+                self._sources[record.id] = "local"
+            else:
+                self.local.delete(record.id)
+                self._sources[record.id] = "remote"
 
     def get(self, entry_id: UUID) -> ExecutionRecord | None:
         with self._lock:
@@ -135,6 +141,10 @@ class DistributedStorage(StorageInterface):
                         self.local.put(record)
                     self._sources[record.id] = "remote"
                     return record
+                if self.config.sync_on_read:
+                    self.local.delete(entry_id)
+                self._sources.pop(entry_id, None)
+                return None
             except Exception as exc:
                 self._failure(exc)
             record = self.local.get(entry_id)

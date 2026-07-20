@@ -227,6 +227,34 @@ def test_connection_loss_reuses_synchronized_local_record() -> None:
     assert client.metrics.snapshot().local_cache_hits == initial_local_hits + 1
 
 
+def test_remote_deletion_does_not_resurrect_stale_local_record() -> None:
+    backend = SharedDistributedBackend()
+    client = distributed_client(backend, "node-a")
+    ctx = context("deleted query")
+    client.remember([1.0, 0.0], "cached", context=ctx)
+    record = client.all()[0]
+    assert client.storage.local.get(record.id) is not None
+    assert backend.delete(record.id)
+
+    assert client.storage.get(record.id) is None
+    assert client.storage.local.get(record.id) is None
+
+
+def test_local_cache_can_be_disabled_without_disabling_fallback() -> None:
+    backend = SharedDistributedBackend()
+    client = distributed_client(backend, "node-a", local_cache=False)
+    ctx = context("remote only")
+    client.remember([1.0, 0.0], "remote", context=ctx)
+
+    assert client.storage.local.all() == []
+    assert client.check([1.0, 0.0], ctx).result == "remote"
+    assert client.storage.local.all() == []
+
+    backend.available = False
+    client.remember([0.0, 1.0], "fallback", context=context("fallback only"))
+    assert len(client.storage.local.all()) == 1
+
+
 def test_outage_can_be_configured_to_fail_closed() -> None:
     backend = SharedDistributedBackend()
     backend.available = False
